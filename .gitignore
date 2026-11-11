@@ -1,0 +1,38 @@
+# Secrets: credentials belong in the macOS Keychain, never in files.
+# These patterns catch any that end up on disk by mistake.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+credentials*.json
+client_secret*.json
+token*.json
+*.secret
+secrets/
+
+# Service state: the database holds email text for up to 24 hours.
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+
+# Real email must never be committed (tests use synthetic email only).
+*.eml
+*.mbox
+real-emails/
+
+# Logs can contain message ids and sender addresses.
+*.log
+logs/
+
+# macOS and editors
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code local settings (per machine)
+.claude/settings.local.json

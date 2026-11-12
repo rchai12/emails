@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 and 1a done. Phase 1b specified (`docs/phases/phase-01b-gmail-client.md`); result pending.
+Status: Phases 0, 1a and 1b done. Phase 1c specified (`docs/phases/phase-01c-gmail-sync.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -12,8 +12,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    Test: 30 real emails, including bills and other mail with a `List-Unsubscribe` header, produce sensible verdicts with no actionable email missed; a re-fetch creates no duplicates; Show full text appears only to you and not in the channel history; a button press from another Discord user is ignored; the extractor runs at a usable speed while the Mac's other services are busy.
    Sub-phases:
    - **1a** the record, the raw-MIME parser and the SQLite store (dedup, 24-hour clearing). Done.
-   - **1b** the Gmail client: token refresh and the four read calls, against a fake Gmail. Specified.
-   - **1c** Gmail sync: the bookmark, inbox only, dedup, first run (3 days), catch-up after an outage.
+   - **1b** the Gmail client: token refresh and the four read calls, against a fake Gmail. Done.
+   - **1c** Gmail sync: the bookmark, inbox only, dedup, first run (3 days), catch-up after an outage. Specified.
    - **1d** the Gmail login command: one-time browser consent that stores the refresh token.
    - **1e** sender authentication and the rules.
    - **1f** the extractor: prompt, schema, validation, a fake model.

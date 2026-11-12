@@ -7,6 +7,8 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 - Gmail API with the read-only scope, over plain REST calls (httpx). Each account has a short name (such as `personal`); its OAuth client ID, client secret and refresh token are Keychain items `gmail.<account>.client-id`, `.client-secret` and `.refresh-token`.
 - New mail is found by polling with a stored history ID, filtered to the inbox. A message added to the inbox later (for example one you move out of spam) counts as new.
 - **First run.** With no history ID yet, the service reads the last 3 days of the inbox, then starts the bookmark.
+- **Still in the inbox.** A message is stored only if, when it is fetched, it is still in the inbox and not in spam or trash. Mail you archive or delete within the minute before a poll is skipped, and a deleted message never blocks the sync.
+- **Link.** `https://mail.google.com/mail/?authuser=<address>#all/<message id>`, so the right account opens when several Google accounts are signed in. **Verify before building:** the link opens the exact message in a desktop browser and on the phone.
 - **Verify before building:** Google refresh tokens for apps left in testing mode can expire after about a week, which would quietly stop ingestion. The read-only Gmail scope is one Google classes as restricted, so also check what publishing the app to production requires for a single personal user, and whether that avoids the full verification process.
 
 ## live.com
@@ -43,7 +45,7 @@ Each adapter keeps a sync bookmark: Gmail's history ID, Graph's delta token, and
 
 When a bookmark is rejected (for example, Gmail returns 404, Graph returns 410 Gone, or Yahoo's `UIDVALIDITY` changes), the adapter:
 
-1. Lists inbox mail received since the last successful poll, going back at most 14 days.
+1. Lists inbox mail received since the last successful poll (with an hour's overlap), going back at most 14 days.
 2. Runs every email through dedup, so anything already seen is skipped.
 3. Sends the rest through triage as usual. A large catch-up is batched into ranked digests like any busy hour.
 4. Starts a fresh bookmark.

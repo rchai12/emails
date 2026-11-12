@@ -94,6 +94,8 @@ def file_id(phase: str) -> str:
 
 def spec_skeleton(args: argparse.Namespace) -> str:
     padded = file_id(args.id)
+    probe = f"docs/verification/probe-{padded}.py"
+    args.given = [path for path in args.given if path != probe]  # the template adds it
     given_tests = [path for path in args.given if Path(path).name.startswith("test_")]
     created_src = [path for path in args.create if path.startswith("src/")]
     ignores = " ".join(f"--ignore={path}" for path in given_tests)
@@ -323,6 +325,11 @@ it must print `Reports OK.`
 """
 
 
+def target(out: Path | None, name: str) -> Path | None:
+    """`--out` may name a folder (the file keeps its phase name) or the file itself."""
+    return out / name if out is not None and out.is_dir() else out
+
+
 def write(text: str, out: Path | None) -> int:
     if out is None:
         print(text, end="")
@@ -361,8 +368,8 @@ def main() -> int:
         return check_embedded(args.guide, args.file)
     if args.command == "new":
         name = f"phase-{file_id(args.id)}-{args.slug}.md"
-        return write(spec_skeleton(args), args.out / name if args.out else None)
-    return write(guide_from_spec(args.spec), args.out)
+        return write(spec_skeleton(args), target(args.out, name))
+    return write(guide_from_spec(args.spec), target(args.out, args.spec.name))
 
 
 if __name__ == "__main__":

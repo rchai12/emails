@@ -32,6 +32,15 @@ MIGRATIONS: tuple[str, ...] = (
     ) STRICT;
     CREATE INDEX messages_text_expiry ON messages (fetched_at) WHERE text_cleared_at IS NULL;
     """,
+    """
+    CREATE TABLE sync_state (
+        provider TEXT NOT NULL CHECK (provider IN ('gmail', 'outlook', 'yahoo')),
+        account TEXT NOT NULL,
+        bookmark TEXT NOT NULL,
+        synced_at TEXT NOT NULL,
+        PRIMARY KEY (provider, account)
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

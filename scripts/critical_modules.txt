@@ -7,3 +7,4 @@ keychain.py
 mime.py
 store.py
 gmail.py
+gmail_sync.py

@@ -60,7 +60,8 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 
 | Table | Holds | Kept |
 | --- | --- | --- |
-| messages | Normalized records, including body text, summary and extractor output | Body text and authentication results (later also the summary and extractor output) cleared 24 hours after fetch; the row stays as a dedup key |
+| messages | Normalized records, including body text | Body text and authentication results cleared 24 hours after fetch; the row stays as a dedup key |
+| triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, and the extractor output (summary, title, deadline, quote, spam reason) | Extractor output cleared with the email's text, 24 hours after fetch; the verdict stays |
 | threads | Thread ID to task ID mapping | Long term; no email text |
 | items | Each email's approval state, checkpoint and Discord message IDs | Long term; no email text |
 | senders | Trusted and muted lists, sender scores | Long term |

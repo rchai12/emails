@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1e done. Phase 1f specified (`docs/phases/phase-01f-extractor.md`); result pending.
+Status: Phases 0 to 1f done. Phase 1g specified (`docs/phases/phase-01g-triage-result.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -16,8 +16,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1c** Gmail sync: the bookmark, inbox only, dedup, first run (3 days), catch-up after an outage. Done.
    - **1d** the Gmail login command: one-time browser consent that stores the refresh token. Done.
    - **1e** sender authentication and the rules. Done.
-   - **1f** the extractor: prompt, schema, validation, a fake model. Specified.
-   - **1g** storing the triage result (cleared after 24 hours), the notify decision and ranking.
+   - **1f** the extractor: prompt, schema, validation, a fake model. Done.
+   - **1g** storing the triage result (cleared after 24 hours), the notify decision and ranking. Specified.
    - **1h** Discord checkpoint 1.
    - **1i** the poll loop that joins them.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.

@@ -38,6 +38,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `gmail_login.py` (read-only scope only, secrets never shown, nothing stored on a failed sign-in; Phase 1d)
 - `sender_auth.py` and `rules.py` (who is verified and trusted, and what is dropped; Phase 1e)
 - `extractor.py` (what model output is accepted; Phase 1f)
+- `triage.py` (what reaches you, and in what order; Phase 1g)
 
 ## Commands
 

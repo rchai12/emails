@@ -47,6 +47,26 @@ MIGRATIONS: tuple[str, ...] = (
         status TEXT NOT NULL CHECK (status IN ('trusted', 'muted'))
     ) STRICT;
     """,
+    """
+    CREATE TABLE triage (
+        provider TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('dropped', 'extracted', 'rejected')),
+        reason TEXT NOT NULL,
+        trusted INTEGER NOT NULL CHECK (trusted IN (0, 1)),
+        verified INTEGER NOT NULL CHECK (verified IN (0, 1)),
+        bulk INTEGER NOT NULL CHECK (bulk IN (0, 1)),
+        notify INTEGER NOT NULL CHECK (notify IN (0, 1)),
+        extraction TEXT,
+        decided_at TEXT NOT NULL,
+        text_cleared_at TEXT,
+        PRIMARY KEY (provider, message_id),
+        CHECK ((outcome = 'rejected') = (reason != '')),
+        CHECK (outcome != 'dropped' OR notify = 0),
+        CHECK (outcome = 'extracted' OR (extraction IS NULL AND text_cleared_at IS NULL)),
+        CHECK (outcome != 'extracted' OR ((extraction IS NULL) = (text_cleared_at IS NOT NULL)))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

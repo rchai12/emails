@@ -16,7 +16,7 @@ Fixed rules drop only mail that is clearly not for you, a local model extracts a
    - suspected spam or phishing: yes or no, with a one-line reason
    - confidence
 4. **Validation.** Code checks the JSON against the schema and rejects anything malformed or too long, naming the field. A rejected email is still sent to you, marked as one the model couldn't read, so no task is missed.
-5. **Decision.** Thresholds in code, not the model, decide whether to send a Discord notification, and whether the email is clearly dated enough for [combined approval](approval-flow.md#combined-approval-for-clearly-dated-emails). Thresholds start low, so borderline emails reach you rather than being dropped. There is no notification cap; in busy hours notifications are [batched into ranked digests](approval-flow.md#busy-hours-batching) instead.
+5. **Decision.** Thresholds in code, not the model, decide whether to send a Discord notification (only a sure non-task is skipped: not actionable, not urgent, no deadline, with high confidence, or medium confidence on bulk mail; trusted senders and unreadable replies are always notified), and whether the email is clearly dated enough for [combined approval](approval-flow.md#combined-approval-for-clearly-dated-emails). Thresholds start low, so borderline emails reach you rather than being dropped. There is no notification cap; in busy hours notifications are [batched into ranked digests](approval-flow.md#busy-hours-batching) instead.
 
 ## Spam and phishing suggestions
 

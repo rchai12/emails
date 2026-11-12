@@ -106,6 +106,8 @@ Importance is ranked by code from the extractor's fields, not by the model:
 5. Higher confidence before lower
 6. Newest first, to break ties
 
+An email the model couldn't read ranks as if nothing is known about it: not urgent, no deadline, lowest confidence.
+
 Trust comes before urgency because urgency is judged from the email's own wording, which a phishing email can fake.
 
 ## Unanswered items

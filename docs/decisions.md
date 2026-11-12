@@ -32,6 +32,8 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Model server | Ollama on the Mac, its own API, `format` set to the schema | Common Mac setup; the reply is held to the schema | An OpenAI-compatible server |
 | Relative deadlines | The model resolves them from the sent date and your time zone; code checks every value | Handles any wording; code still decides what counts | A date parser in code |
 | Unreadable model reply | Rejected by field name and still sent to you, marked as unread by the model | No task is missed | Holding it silently; retrying |
+| Notify threshold | Skip only a sure non-task: not actionable, not urgent, no deadline, high confidence (or medium on bulk mail); always notify trusted senders and unreadable replies | Misses as little as possible while quieting confident newsletters | Notifying everything not muted; notifying only actionable mail |
+| Unreadable email's rank | As if nothing is known: not urgent, no deadline, low confidence, above suspected spam | The model's failure says nothing about importance | Near the top of a digest |
 | Bulk-mail headers | Lower the score, never drop | Bills and work mail often carry `List-Unsubscribe` | Dropping on the header alone |
 | Triage tuning | Miss as few tasks as possible | A "Not a task" tap is cheap; a missed task is not | Tuning for fewer notifications |
 | Spam and phishing | The model suggests with a reason; you decide | Catches crafted "urgent" mail without ever hiding real mail | Auto-filing as spam |

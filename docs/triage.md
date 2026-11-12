@@ -4,8 +4,8 @@ Fixed rules drop only mail that is clearly not for you, a local model extracts a
 
 ## Pipeline
 
-1. **Sender check.** Code reads the provider's authentication results (SPF, DKIM and DMARC). A sender counts as [trusted](approval-flow.md#trusted-senders) only if the address is on your trusted list and the email passes DMARC, or both SPF and DKIM for the sender's domain. Otherwise it's treated as untrusted, so a forged "From" address gains nothing.
-2. **Rules.** Only your muted senders and known newsletter senders are dropped with no model call. Mail from a trusted sender is never dropped. Bulk-mail signs such as a `List-Unsubscribe` header lower the email's score instead of dropping it, because banks, bills, schools and work systems often send with that header.
+1. **Sender check.** Code reads the provider's authentication results (SPF, DKIM and DMARC). A sender counts as [trusted](approval-flow.md#trusted-senders) only if the address is on your trusted list and the email passes DMARC, or both SPF and DKIM for the sender's domain. Otherwise it's treated as untrusted, so a forged "From" address gains nothing. Only the provider's own header counts (the first one, from `mx.google.com` for Gmail), because anyone can put such a header in the mail they send.
+2. **Rules.** Only your muted senders are dropped with no model call; there is no built-in newsletter list, so Mute sender is how a newsletter stops. Mail from a trusted sender is never dropped. Bulk-mail signs such as a `List-Unsubscribe` header lower the email's score instead of dropping it, because banks, bills, schools and work systems often send with that header.
 3. **Extractor.** A local model of 27B parameters or more (such as Qwen 3.6 or 3.8) with no tools reads the message and returns strict JSON:
    - urgent
    - actionable

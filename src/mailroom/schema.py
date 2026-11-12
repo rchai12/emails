@@ -41,6 +41,12 @@ MIGRATIONS: tuple[str, ...] = (
         PRIMARY KEY (provider, account)
     ) STRICT;
     """,
+    """
+    CREATE TABLE senders (
+        address TEXT PRIMARY KEY,
+        status TEXT NOT NULL CHECK (status IN ('trusted', 'muted'))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

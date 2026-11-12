@@ -9,3 +9,5 @@ store.py
 gmail.py
 gmail_sync.py
 gmail_login.py
+sender_auth.py
+rules.py

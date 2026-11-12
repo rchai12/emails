@@ -27,6 +27,8 @@ An email becomes a task only after your approval on Discord, and the service hol
 | First run | Read the last 3 days of the inbox | Recent mail may still need action; older mail you've already seen | Start from now; 14 days |
 | Parsing | Each adapter fetches the raw RFC 822 message; one shared parser builds the record | One code path gives identical records for identical emails | Mapping each provider's JSON separately |
 | HTML email | Standard library `html.parser`, link addresses kept as plain text | No dependency parsing untrusted input; the model and you see where links point | An HTML-to-text package |
+| Dropped mail | Only senders you muted, matched by exact address | Nothing is dropped that you never chose | A built-in newsletter list; muting whole domains |
+| Which authentication header | The first one, and only from the provider's own server | Senders can add their own fake headers lower down | Reading every header |
 | Bulk-mail headers | Lower the score, never drop | Bills and work mail often carry `List-Unsubscribe` | Dropping on the header alone |
 | Triage tuning | Miss as few tasks as possible | A "Not a task" tap is cheap; a missed task is not | Tuning for fewer notifications |
 | Spam and phishing | The model suggests with a reason; you decide | Catches crafted "urgent" mail without ever hiding real mail | Auto-filing as spam |

@@ -94,7 +94,7 @@ def file_id(phase: str) -> str:
 
 def spec_skeleton(args: argparse.Namespace) -> str:
     padded = file_id(args.id)
-    given_tests = [path for path in args.given if path.startswith("tests/")]
+    given_tests = [path for path in args.given if Path(path).name.startswith("test_")]
     created_src = [path for path in args.create if path.startswith("src/")]
     ignores = " ".join(f"--ignore={path}" for path in given_tests)
     given_rows = "\n".join(f"| `{path}` | TODO |" for path in args.given)

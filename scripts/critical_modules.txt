@@ -6,3 +6,4 @@ config.py
 keychain.py
 mime.py
 store.py
+gmail.py

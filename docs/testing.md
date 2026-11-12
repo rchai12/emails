@@ -33,6 +33,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `keychain.py` (secrets read only by name, and never echoed; Phase 0)
 - `mime.py` (untrusted email text cleaned, limited, and never a crash; Phase 1a)
 - `store.py` (deduplication, and email text cleared from the file after 24 hours; Phase 1a)
+- `gmail.py` (read-only Gmail calls, secrets never echoed; Phase 1b)
 
 ## Commands
 

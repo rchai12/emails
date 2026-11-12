@@ -4,8 +4,9 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 
 ## Gmail
 
-- Gmail API with the read-only scope.
-- New mail is found by polling with a stored history ID.
+- Gmail API with the read-only scope, over plain REST calls (httpx). Each account has a short name (such as `personal`); its OAuth client ID, client secret and refresh token are Keychain items `gmail.<account>.client-id`, `.client-secret` and `.refresh-token`.
+- New mail is found by polling with a stored history ID, filtered to the inbox. A message added to the inbox later (for example one you move out of spam) counts as new.
+- **First run.** With no history ID yet, the service reads the last 3 days of the inbox, then starts the bookmark.
 - **Verify before building:** Google refresh tokens for apps left in testing mode can expire after about a week, which would quietly stop ingestion. The read-only Gmail scope is one Google classes as restricted, so also check what publishing the app to production requires for a single personal user, and whether that avoids the full verification process.
 
 ## live.com

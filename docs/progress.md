@@ -73,3 +73,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1h: Discord posting (2026-11-12)
+- Tests: 407 -> 441 (given 30)
+- New public names: `store`: `Post`, `queue_notified`, `pending_posts`, `post`, `mark_posted`; `config`: `DISCORD_CHANNEL_MESSAGE`, `discord_channel_id`; `checkpoint`: `checkpoint_message`; `discord_post`: `TIMEOUT_SECONDS`, `DiscordUnavailable`, `PostReport`, `open_discord_http`, `post_pending`
+- Changed files: 7
+- Deviations:
+  - None
+- Follow-ups:
+  - None

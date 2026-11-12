@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal, cast
 
-from mailroom import clock
+from mailroom import clock, ids
 from mailroom.config import Settings, prepare_data_dir
 from mailroom.extractor import Deadline, Extraction
 from mailroom.record import Record
@@ -168,6 +168,16 @@ class StoredTriage:
     verdict: Verdict
     decided_at: datetime
     text_cleared_at: datetime | None
+
+
+@dataclass(frozen=True)
+class Post:
+    item_id: str
+    provider: str
+    message_id: str
+    queued_at: datetime
+    discord_message_id: str | None
+    posted_at: datetime | None
 
 
 class Store:
@@ -384,6 +394,83 @@ class Store:
         self._connection.execute(_CLEAR_TRIAGE, (stamp, cutoff))
         self._connection.commit()
         return cursor.rowcount
+
+    def queue_notified(self) -> int:
+        queued_at = _stamp(clock.now())
+        rows = self._connection.execute(
+            """
+            SELECT provider, message_id
+            FROM triage
+            WHERE notify = 1
+              AND NOT EXISTS (
+                  SELECT 1 FROM posts
+                  WHERE posts.provider = triage.provider
+                    AND posts.message_id = triage.message_id
+              )
+            ORDER BY decided_at, provider, message_id
+            """
+        ).fetchall()
+        for provider, message_id in rows:
+            self._connection.execute(
+                """
+                INSERT INTO posts (
+                    item_id, provider, message_id, queued_at,
+                    discord_message_id, posted_at
+                ) VALUES (?, ?, ?, ?, NULL, NULL)
+                """,
+                (ids.new_id(), provider, message_id, queued_at),
+            )
+        self._connection.commit()
+        return len(rows)
+
+    def pending_posts(self) -> tuple[Post, ...]:
+        rows = self._connection.execute(
+            """
+            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at
+            FROM posts
+            WHERE posted_at IS NULL
+            ORDER BY queued_at, rowid
+            """
+        ).fetchall()
+        return tuple(_read_post(row) for row in rows)
+
+    def post(self, provider: str, message_id: str) -> Post | None:
+        row = self._connection.execute(
+            """
+            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at
+            FROM posts
+            WHERE provider = ? AND message_id = ?
+            """,
+            (provider, message_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return _read_post(row)
+
+    def mark_posted(self, item_id: str, discord_message_id: str) -> bool:
+        posted_at = _stamp(clock.now())
+        cursor = self._connection.execute(
+            """
+            UPDATE posts
+            SET discord_message_id = ?, posted_at = ?
+            WHERE item_id = ? AND posted_at IS NULL
+            """,
+            (discord_message_id, posted_at, item_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount == 1
+
+
+def _read_post(row: tuple) -> Post:
+    item_id, provider, message_id, queued_at, discord_message_id, posted_at = row
+    return Post(
+        item_id=item_id,
+        provider=provider,
+        message_id=message_id,
+        queued_at=_read_time(queued_at),
+        discord_message_id=discord_message_id,
+        posted_at=None if posted_at is None else _read_time(posted_at),
+    )
 
 
 def open_store(settings: Settings) -> Store:

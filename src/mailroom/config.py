@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -10,12 +11,17 @@ EXTRACTOR_URL_MESSAGE = (
     "MAILROOM_EXTRACTOR_URL must be http:// on 127.0.0.1, localhost or [::1], with no path"
 )
 TIME_ZONE_MESSAGE = "MAILROOM_TIME_ZONE must be an IANA time zone name"
+DISCORD_CHANNEL_MESSAGE = (
+    "MAILROOM_DISCORD_CHANNEL_ID must be a Discord channel id (17 to 20 digits)"
+)
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+_CHANNEL_ID = re.compile(r"[0-9]{17,20}")
 _FIELD_MESSAGES = {
     "data_dir": DATA_DIR_MESSAGE,
     "extractor_url": EXTRACTOR_URL_MESSAGE,
     "time_zone": TIME_ZONE_MESSAGE,
+    "discord_channel_id": DISCORD_CHANNEL_MESSAGE,
 }
 
 
@@ -48,6 +54,7 @@ class Settings(BaseSettings):
     extractor_url: str = "http://127.0.0.1:11434"
     extractor_model: str = ""
     time_zone: str = ""
+    discord_channel_id: str = ""
 
     @field_validator("data_dir", mode="before")
     @classmethod
@@ -74,6 +81,13 @@ class Settings(BaseSettings):
         except (ZoneInfoNotFoundError, ValueError):
             raise ValueError(TIME_ZONE_MESSAGE) from None
         return value
+
+    @field_validator("discord_channel_id")
+    @classmethod
+    def _check_discord_channel_id(cls, value: str) -> str:
+        if value == "" or _CHANNEL_ID.fullmatch(value):
+            return value
+        raise ValueError(DISCORD_CHANNEL_MESSAGE)
 
 
 def get_settings() -> Settings:

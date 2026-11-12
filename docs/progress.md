@@ -19,3 +19,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - If get_content() is not text, or get_payload() raises, the body is empty. If the content type cannot be read, the decoded text is kept as plain text.
 - Follow-ups:
   - None
+
+## Phase 1b: Gmail client (2026-11-11)
+- Tests: 175 -> 212 (given 30)
+- New public names: `gmail`: `TOKEN_URL`, `API_URL`, `SCOPE`, `PAGE_SIZE`, `TIMEOUT_SECONDS`, `TOKEN_MARGIN`, `ACCOUNT_MESSAGE`, `MESSAGE_ID_MESSAGE`, `GmailError`, `GmailAuthError`, `GmailUnavailable`, `BookmarkExpired`, `Profile`, `MessageRef`, `History`, `RawMessage`, `GmailClient`, `open_gmail`
+- Changed files: 3
+- Deviations:
+  - None
+- Follow-ups:
+  - None

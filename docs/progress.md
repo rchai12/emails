@@ -37,3 +37,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1d: Gmail login (2026-11-12)
+- Tests: 239 -> 271 (given 29)
+- New public names: `keychain`: `VALUE_MESSAGE`, `set_secret`; `gmail_login`: `AUTH_URL`, `CALLBACK_TIMEOUT`, `REQUEST_TIMEOUT_SECONDS`, `DONE_PAGE`, `CANCELLED_PAGE`, `LoginError`, `new_verifier`, `code_challenge`, `consent_url`, `Callback`, `exchange_code`, `login`, `new_http`; `cli`: `gmail_login_command`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

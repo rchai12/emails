@@ -1,6 +1,10 @@
+import webbrowser
+
 import typer
 
-from mailroom import __version__
+from mailroom import __version__, gmail_login
+from mailroom.gmail import GmailError
+from mailroom.keychain import KeychainError
 
 app = typer.Typer()
 
@@ -14,3 +18,26 @@ def _main() -> None:
 def version() -> None:
     """Print the version."""
     typer.echo(f"mailroom {__version__}")
+
+
+@app.command("gmail-login")
+def gmail_login_command(account: str, new_client: bool = False) -> None:
+    """Sign in to one Gmail account and store its refresh token."""
+
+    def open_browser(address: str) -> None:
+        typer.echo("Opening Google sign-in. If no browser opens, visit:")
+        typer.echo(address)
+        webbrowser.open(address)
+
+    try:
+        signed_in = gmail_login.login(
+            account,
+            gmail_login.new_http(),
+            ask=lambda label: typer.prompt(label, hide_input=True),
+            open_browser=open_browser,
+            new_client=new_client,
+        )
+    except (gmail_login.LoginError, GmailError, KeychainError, ValueError) as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(f"Signed in: {account} ({signed_in})")

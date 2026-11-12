@@ -23,11 +23,12 @@ Build them as the codebase grows, so each phase costs fewer steps and fewer toke
 
 - `phase_status.py`: step 1's facts in one run: tree state, last commits, specs without a review, the latest progress entry, the newest review's head, and the public names the last phase added. Run `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python .claude/skills/phase-architect/phase_status.py` (`python3.12` before `.venv` exists).
 - `phase_tools.py searches SPEC [--cwd DIR]`: runs each command of the spec's `### Searches` block and prints its match count. Run it on the repository (expect 0s) and with `--cwd` on the `fail<NN>` clone with planted lines (expect matches).
-- `phase_tools.py embedded GUIDE FILE`: checks the guide's embedded probe is byte for byte the probe file.
+- `phase_tools.py embedded GUIDE FILE`: checks a guide's embedded probe against the probe file (phases 0 and 1a only; later probes are committed files).
+- `phase_tools.py new --id ID --slug SLUG --title TITLE --n N --given PATHS --create PATHS --out DIR`: writes the spec skeleton with every fixed section filled (Start command, Given files and Scope tables, Acceptance rows, the standing searches); replace each `TODO`.
+- `phase_tools.py guide SPEC --out FILE`: writes the guide's fixed parts from the finished spec (Coder ran with the baseline check, Gates from Acceptance, the probe section, the Searches table, Verdict); write the `TODO`s: spot checks, the probe line, each search's rule, reasonable variations.
 
 - **When to build one.** A manual step done the same way in two phases becomes a script before the third. A step that went wrong because it was done by hand (a miscounted test total, an embedded copy that drifted, a restore that missed a file) becomes a script at once.
 - **Likely next tools,** in roughly the order they'll earn their place:
-  - spec and guide templates, plus a generator that fills them and embeds given files by path, checking every embedded copy against the file
   - a spot-check runner: makes one exact-text edit (exactly one match, or it stops), runs one test, prints the failure lines, restores the file and clears caches
   - a probe skeleton with the self-check, the wrapped checks and the `FAILURES N` summary already in place
 - **Rules for tools.** Each one does one job, prints only what the next step needs (short output saves tokens), and passes the project's linter and formatter. Use the language and runner phase 00 chose. A tool that reads project files is updated in the same phase that changes their layout.
@@ -39,6 +40,7 @@ Build them as the codebase grows, so each phase costs fewer steps and fewer toke
 |---|---|
 | `docs/phases/phase-NNx-<slug>.md` | Specs |
 | `docs/verification/phase-NNx-<slug>.md` | Verification guides |
+| `docs/verification/probe-NNx.py` | Probes, given files from phase 1b on |
 | `docs/reviews/phase-NNx-<slug>.md` | The verifier's verdicts |
 | `docs/progress.md` | The coder's entries, one `## Phase NNx: ` heading per phase |
 | `.claude/skills/phase-architect/history.md` | One line per phase |
@@ -61,17 +63,26 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 
 ## Checklist
 
+### Keeping a phase cheap
+
+Phase 1a cost the most of any phase so far: it was twice the size limit, its probe re-implemented the spec, and facts found late forced rewrites. These rules hold in every step:
+
+- **Quiet output.** A test run prints counts grouped by reason (`--tb=line -q 2>&1 | grep '^E ' | sort | uniq -c`) or its last lines (`| tail -3`), never the full list of failures or collected tests. Long files are read by range, not whole.
+- **Facts before files.** Every spike, and every fuzz of a library whose exceptions the spec must handle, runs before the first test is written. Error rules are settled before any expected value depends on them.
+- **Decide once.** Test ids, literal expected values and the final formatting go into a test the first time it is written, never in a second pass.
+- **Write each thing once.** The probe is a committed given file, never copied into the guide; the guide's fixed sections come from `phase_tools.py guide`, the spec's from `phase_tools.py new`.
+
 ### 1. Start (every turn that mentions a phase)
 
 1. Run `phase_status.py` (see Tools) before saying anything about a phase's state. Never state it from memory or from a summary.
 2. A review that lists every file as absent means the coder never ran: tell the owner to run the coder, and do not change the spec. A FAIL whose only findings come from an uncommitted baseline (given files untracked, a dirty tree before the coder started) is neither the spec's fault nor the code's: compare each given file with the clean `fail<NN>` copy (`cmp`), commit the baseline without the coder's files (stage a coder-appended file such as `docs/progress.md` at its given content), leave the coder's work uncommitted, and have the verifier re-run.
 3. A FAIL review: read it. If my spec caused it, add a "Corrections" section to the spec, keep the coder's code, and re-run each corrected spot-check row against the committed code before publishing. If the code caused it, it goes back to the coder; never bend the spec to fit wrong code.
 4. Record the last phase's result in `history.md` (replace "result pending"). Turn each miss into a line of this checklist, or sharpen an existing line. Never only log it.
-5. Read: the roadmap row, the progress entries' deviations, the rules of `AGENTS.md` that bite in this phase, the design docs the phase touches, and the code the phase touches (quote real names and signatures, never ones a spec only planned).
+5. Read only what the phase touches, by section (`grep -n '^#' <doc>`, then that range): the roadmap row, the progress entries' deviations, the rules of `AGENTS.md` that bite in this phase, the design docs the phase touches, and the code the phase touches (quote real names and signatures, never ones a spec only planned).
 
 ### 2. Decide
 
-6. Size: about 10 requirements, 30 given tests (counting each parameter set), 3 to 5 public units. Split into lettered sub-phases before writing any test. A new provider adapter is usually its own sub-phase.
+6. Size: at most about 10 requirements, 30 given tests (counting each parameter set and tests of given code), 3 to 5 public units. **This is a limit, not a guide**: over it, split into lettered sub-phases before writing any test, and never note the overrun and carry on (phase 1a did). A new provider adapter is usually its own sub-phase.
 7. Ask the owner the design questions (AskUserQuestion, a recommended option first in each). Check any claim about another project, a provider API or a library in its code, its documentation, or on the machine first. A question the design docs already answer is not asked again.
 8. **Decide what is given and what the coder writes, before writing any file.** Given: contracts that must not drift: the normalized record, the extractor's JSON schema and prompt text, the database schema, the tasks app payload, Discord message layouts and button ids, exact user-facing messages, and fakes checked against the real provider's response shape. The coder must have real work, and the given tests must fail before it.
 9. Before changing earlier behaviour or adding to a list earlier tests enumerate: `git grep` the tests for its names, messages, and values, and give an edit for each test that pins it.
@@ -79,7 +90,7 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 
 ### 3. Spike
 
-11. Spike only a real unknown, in a few lines, in the scratchpad, and throw it away. A fact about a library's default comes from reading the library, never from a value the spike set. Spikes never use the owner's mailboxes, tokens, Discord server or real emails: synthetic data only. A fact that can only be checked against a live provider (token lifetimes, scope rules, app password availability) goes in the spec as "Verify before building" for the owner, never guessed. The facts go in the spec's "Facts".
+11. Spike before writing anything else, and only a real unknown. Fuzz (a few thousand corrupted inputs) every library call the spec will tell the coder to guard, and pin each exception found. Spike in a few lines, in the scratchpad, and throw it away. A fact about a library's default comes from reading the library, never from a value the spike set. Spikes never use the owner's mailboxes, tokens, Discord server or real emails: synthetic data only. A fact that can only be checked against a live provider (token lifetimes, scope rules, app password availability) goes in the spec as "Verify before building" for the owner, never guessed. The facts go in the spec's "Facts".
 
 ### 4. Given tests, in the `fail<NN>` clone
 
@@ -93,7 +104,7 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 
 ### 5. Probe
 
-18. Write a standalone probe script. Its oracle is built from its own tables only, never from the code under test. It checks itself on known cases (`assert` lines) first. Random inputs are a valid base with at most one change: one header, one date, one field of the extractor's JSON. Each check is wrapped, so an exception prints `FAIL` and the run reaches `FAILURES N`. Email inputs are raw messages (headers and MIME as a provider returns them), not objects a parser already cleaned up. Before promising that code built on a library never raises, fuzz the library calls the spec prescribes and pin each exception found in a given test. A model-based check uses its own seeded generator and asserts the run reached every case it means to (for example, some rows left uncleared).
+18. Write the probe as the given file `docs/verification/probe-NNx.py`: linted and formatted like the code (`scripts/check.py` lints it), committed with the spec, never embedded in the guide. **Keep it lean:** check properties (never raises, every field within its limit, no forbidden text, the store matches a model of its state), not a re-implementation of the spec's rules; a reference implementation only for a rule of a few lines. Its oracle is built from its own tables only, never from the code under test. It checks itself on known cases (`assert` lines) first. Random inputs are a valid base with at most one change: one header, one date, one field of the extractor's JSON. Each check is wrapped, so an exception prints `FAIL` and the run reaches `FAILURES N`. Email inputs are raw messages (headers and MIME as a provider returns them), not objects a parser already cleaned up. Before promising that code built on a library never raises, fuzz the library calls the spec prescribes and pin each exception found in a given test. A model-based check uses its own seeded generator and asserts the run reached every case it means to (for example, some rows left uncleared).
 19. Run the oracle part alone, then the probe on today's code: its new checks must print `FAIL`, and nothing may stop. Keep it lean: it checks what the given tests do not reach.
 
 ### 6. Spot checks (on paper)
@@ -102,10 +113,10 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 
 ### 7. Write the spec and the guide
 
-21. The spec has, in order: Goal, Facts, Owner's decisions, Architect's decisions, Requirements (numbered), Given files, Tests to write, Out of scope, Rules that bite, Acceptance. It fixes every public name and message, separates the owner's decisions from the architect's, names in "Out of scope" what a capable coder would over-deliver (a second provider, retries nobody asked for, a nicer Discord layout), and restates the project rules that bite in this phase.
+21. Start the spec with `phase_tools.py new` and fill its `TODO`s. The spec has, in order: Goal, Facts, Owner's decisions, Architect's decisions, Requirements (numbered), Given files, Tests to write, Out of scope, Rules that bite, Acceptance. It fixes every public name and message, separates the owner's decisions from the architect's, names in "Out of scope" what a capable coder would over-deliver (a second provider, retries nobody asked for, a nicer Discord layout), and restates the project rules that bite in this phase.
 22. Acceptance: the Start command and its count; at least N + given tests passed; the given files' exact test count; the coverage command; `grep -c "^## Phase <id>: " docs/progress.md` printing `1`; `scripts/check_reports.py --phase <id>`; the searches; `git diff HEAD --stat -- <given files>` printing nothing.
 23. Searches use `git grep --untracked -n -E`, with **no `\b`** (it silently matches nothing; use `([^A-Za-z_]|$)`). Name the risky call, never a common attribute. Run each one on today's code (silence) and on a planted line (a match) with `phase_tools.py searches`. Every phase carries the searches for the project rules it could break: for example an IMAP `SELECT` or `STORE`, a fetch of `BODY[` without `PEEK`, a provider send or modify call, or a network call to anything but the local model in triage code.
-24. The guide has, in order: Coder ran (files present, progress entry exists, the spec and given files tracked by git), Gates (the acceptance commands), Spot checks, Probe, Searches, Reasonable variations (what is correct even though the spec didn't say it), Verdict format. Spot checks restore by the reverse edit and clear caches before further gates. A stop at the probe's `assert` lines is the probe's fault. A different failure from the "Broken" column is a note, not a finding.
+24. Generate the guide with `phase_tools.py guide SPEC --out <scratch>/guide.md`, then write its `TODO`s. The guide has, in order: Coder ran (files present, progress entry exists, the spec and given files tracked by git), Gates (the acceptance commands), Spot checks, Probe, Searches, Reasonable variations (what is correct even though the spec didn't say it), Verdict format. Spot checks restore by the reverse edit and clear caches before further gates. A stop at the probe's `assert` lines is the probe's fault. A different failure from the "Broken" column is a note, not a finding.
 25. Write both documents directly into `docs/phases/` and `docs/verification/`. Copy the given files from the clone into the repository and compare each byte for byte; check the guide's embedded probe with `phase_tools.py embedded`.
 
 ### 8. Hand over

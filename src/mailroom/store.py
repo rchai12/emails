@@ -56,6 +56,12 @@ class StoredMessage:
     text_cleared_at: datetime | None
 
 
+@dataclass(frozen=True)
+class SyncState:
+    bookmark: str
+    synced_at: datetime
+
+
 class Store:
     def __init__(self, path: Path) -> None:
         self._connection = sqlite3.connect(path)
@@ -147,6 +153,26 @@ class Store:
             fetched_at=_read_time(fetched_at),
             text_cleared_at=None if text_cleared_at is None else _read_time(text_cleared_at),
         )
+
+    def sync_state(self, provider: str, account: str) -> SyncState | None:
+        row = self._connection.execute(
+            "SELECT bookmark, synced_at FROM sync_state WHERE provider = ? AND account = ?",
+            (provider, account),
+        ).fetchone()
+        if row is None:
+            return None
+        bookmark, synced_at = row
+        return SyncState(bookmark=bookmark, synced_at=_read_time(synced_at))
+
+    def save_sync_state(self, provider: str, account: str, state: SyncState) -> None:
+        self._connection.execute(
+            """
+            INSERT OR REPLACE INTO sync_state (provider, account, bookmark, synced_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (provider, account, state.bookmark, _stamp(state.synced_at)),
+        )
+        self._connection.commit()
 
     def clear_expired_text(self) -> int:
         now = clock.now()

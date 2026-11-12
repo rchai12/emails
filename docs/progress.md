@@ -28,3 +28,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1c: Gmail sync (2026-11-12)
+- Tests: 212 -> 239 (given 25)
+- New public names: `gmail`: `MessageGone`; `store`: `SyncState`; `gmail_sync`: `FIRST_RUN`, `CATCH_UP_LIMIT`, `CATCH_UP_OVERLAP`, `LINK`, `SyncResult`, `sync_gmail`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

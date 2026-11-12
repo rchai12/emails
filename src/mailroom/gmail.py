@@ -41,6 +41,11 @@ class BookmarkExpired(GmailError):
         super().__init__(f"gmail history expired: {account}")
 
 
+class MessageGone(GmailError):
+    def __init__(self, account: str) -> None:
+        super().__init__(f"gmail message gone: {account}")
+
+
 @dataclass(frozen=True)
 class Profile:
     email_address: str
@@ -134,7 +139,7 @@ class GmailClient:
     def fetch(self, message_id: str) -> RawMessage:
         if _MESSAGE_ID.fullmatch(message_id) is None:
             raise ValueError(MESSAGE_ID_MESSAGE)
-        body = self._read(f"/messages/{message_id}", {"format": "raw"})
+        body = self._read(f"/messages/{message_id}", {"format": "raw"}, gone=True)
         raw = self._raw_bytes(self._text(body.get("raw")))
         millis = self._millis(self._text(body.get("internalDate")))
         labels = tuple(self._text(label) for label in self._items(body, "labelIds"))
@@ -169,10 +174,13 @@ class GmailClient:
         params: dict[str, object],
         *,
         expired_bookmark: bool = False,
+        gone: bool = False,
     ) -> dict[str, object]:
         response = self._get(path, params)
         if expired_bookmark and response.status_code == 404:
             raise BookmarkExpired(self.account) from None
+        if gone and response.status_code == 404:
+            raise MessageGone(self.account) from None
         if response.status_code != 200:
             raise GmailUnavailable(self.account, response.status_code) from None
         return self._mapping(self._json_body(response))

@@ -17,6 +17,9 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Flagging | The Discord notification is the flag | Read-only access can't label mail | Labels in the mailbox (needs write access) |
 | Retention | Email text deleted after 24 hours | Keeps as little personal data as possible | Keeping bodies indefinitely |
 | State storage | One local SQLite database, no vector search in v1 | Every lookup is exact; embeddings would leak email text past 24 hours | A database server; a vector store |
+| Database access | Standard library `sqlite3`, plain SQL, numbered migrations | No dependency; every query visible and testable | SQLAlchemy and Alembic |
+| Parsing | Each adapter fetches the raw RFC 822 message; one shared parser builds the record | One code path gives identical records for identical emails | Mapping each provider's JSON separately |
+| HTML email | Standard library `html.parser`, link addresses kept as plain text | No dependency parsing untrusted input; the model and you see where links point | An HTML-to-text package |
 | Bulk-mail headers | Lower the score, never drop | Bills and work mail often carry `List-Unsubscribe` | Dropping on the header alone |
 | Triage tuning | Miss as few tasks as possible | A "Not a task" tap is cheap; a missed task is not | Tuning for fewer notifications |
 | Spam and phishing | The model suggests with a reason; you decide | Catches crafted "urgent" mail without ever hiding real mail | Auto-filing as spam |

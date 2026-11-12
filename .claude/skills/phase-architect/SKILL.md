@@ -22,13 +22,14 @@ The design lives in `docs/`: purpose and scope, decisions, architecture, ingesti
 Build them as the codebase grows, so each phase costs fewer steps and fewer tokens than the last. Current tools:
 
 - `phase_status.py`: step 1's facts in one run: tree state, last commits, specs without a review, the latest progress entry, the newest review's head, and the public names the last phase added. Run `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python .claude/skills/phase-architect/phase_status.py` (`python3.12` before `.venv` exists).
+- `phase_tools.py searches SPEC [--cwd DIR]`: runs each command of the spec's `### Searches` block and prints its match count. Run it on the repository (expect 0s) and with `--cwd` on the `fail<NN>` clone with planted lines (expect matches).
+- `phase_tools.py embedded GUIDE FILE`: checks the guide's embedded probe is byte for byte the probe file.
 
 - **When to build one.** A manual step done the same way in two phases becomes a script before the third. A step that went wrong because it was done by hand (a miscounted test total, an embedded copy that drifted, a restore that missed a file) becomes a script at once.
 - **Likely next tools,** in roughly the order they'll earn their place:
   - spec and guide templates, plus a generator that fills them and embeds given files by path, checking every embedded copy against the file
   - a spot-check runner: makes one exact-text edit (exactly one match, or it stops), runs one test, prints the failure lines, restores the file and clears caches
   - a probe skeleton with the self-check, the wrapped checks and the `FAILURES N` summary already in place
-  - a search runner that runs each search on today's code and on a planted line
 - **Rules for tools.** Each one does one job, prints only what the next step needs (short output saves tokens), and passes the project's linter and formatter. Use the language and runner phase 00 chose. A tool that reads project files is updated in the same phase that changes their layout.
 - **Keep this list current.** When a tool is added, list it here with one line on what it does, and replace the manual instruction in the checklist with the command. Remove a tool that stops being used.
 
@@ -86,13 +87,13 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 13. **Never build the feature in the clone.** Signs of drift, any one of which means stop: running the whole suite or `scripts/check` there, a scratch source diff of more than about 30 lines beyond the given parts, or confirming a spot check or an expected value by running new code.
 14. Write tests in their final formatted shape, and edit them by exact text with an asserted single match, never with `sed` regexes. The shell is zsh: loop over an array (`files=(a b); for f in "${files[@]}"`), never an unquoted string variable, which zsh does not split.
 14a. Until `src/mailroom/__init__.py` exists the linter needs `known-first-party`; it is set in `pyproject.toml`. Run the linter and format check on the repository (read-only, `--no-cache`) as well as in the clone, since a stub present only in the clone can hide a problem.
-15. Expected values are literal. Ids are read from the output, never counter values. Times come from the fake clock, never the wall clock. A case that varies a base changes one field, and each refusal case is read against the base for a second, unintended difference.
-16. Fail check: run only the given tests; each fails for the right reason (the missing behaviour, not a typo). Lines after a test's first failing assertion never run, so check every attribute and method they use against the real class.
+15. Parametrized cases get readable `ids=` (the guide names tests by id). Expected values are literal. Ids are read from the output, never counter values. Times come from the fake clock, never the wall clock. A case that varies a base changes one field, and each refusal case is read against the base for a second, unintended difference.
+16. Fail check: run only the given tests; each fails for the right reason (the missing behaviour, not a typo). Lines after a test's first failing assertion never run, so check every attribute and method they use against the real class. Then run the whole suite in the repository as the coder will find it: given test files that cannot import yet stop collection, so the spec's "Start" command `--ignore`s them and names the count that remains.
 17. Every requirement has a given test, or a "Tests to write" bullet with its deciding input.
 
 ### 5. Probe
 
-18. Write a standalone probe script. Its oracle is built from its own tables only, never from the code under test. It checks itself on known cases (`assert` lines) first. Random inputs are a valid base with at most one change: one header, one date, one field of the extractor's JSON. Each check is wrapped, so an exception prints `FAIL` and the run reaches `FAILURES N`. Email inputs are raw messages (headers and MIME as a provider returns them), not objects a parser already cleaned up.
+18. Write a standalone probe script. Its oracle is built from its own tables only, never from the code under test. It checks itself on known cases (`assert` lines) first. Random inputs are a valid base with at most one change: one header, one date, one field of the extractor's JSON. Each check is wrapped, so an exception prints `FAIL` and the run reaches `FAILURES N`. Email inputs are raw messages (headers and MIME as a provider returns them), not objects a parser already cleaned up. Before promising that code built on a library never raises, fuzz the library calls the spec prescribes and pin each exception found in a given test. A model-based check uses its own seeded generator and asserts the run reached every case it means to (for example, some rows left uncleared).
 19. Run the oracle part alone, then the probe on today's code: its new checks must print `FAIL`, and nothing may stop. Keep it lean: it checks what the given tests do not reach.
 
 ### 6. Spot checks (on paper)
@@ -102,10 +103,10 @@ Until phase 00 exists, the commands in this checklist that name project tooling 
 ### 7. Write the spec and the guide
 
 21. The spec has, in order: Goal, Facts, Owner's decisions, Architect's decisions, Requirements (numbered), Given files, Tests to write, Out of scope, Rules that bite, Acceptance. It fixes every public name and message, separates the owner's decisions from the architect's, names in "Out of scope" what a capable coder would over-deliver (a second provider, retries nobody asked for, a nicer Discord layout), and restates the project rules that bite in this phase.
-22. Acceptance: at least N + given tests passed; the given files' exact test count; the coverage command; `grep -c "^## Phase <id>: " docs/progress.md` printing `1`; `scripts/check_reports.py --phase <id>`; the searches; `git diff HEAD --stat -- <given files>` printing nothing.
-23. Searches use `git grep --untracked -n -E`, with **no `\b`** (it silently matches nothing; use `([^A-Za-z_]|$)`). Name the risky call, never a common attribute. Run each one on today's code (silence), and on a planted line (a match). Every phase carries the searches for the project rules it could break: for example an IMAP `SELECT` or `STORE`, a fetch of `BODY[` without `PEEK`, a provider send or modify call, or a network call to anything but the local model in triage code.
+22. Acceptance: the Start command and its count; at least N + given tests passed; the given files' exact test count; the coverage command; `grep -c "^## Phase <id>: " docs/progress.md` printing `1`; `scripts/check_reports.py --phase <id>`; the searches; `git diff HEAD --stat -- <given files>` printing nothing.
+23. Searches use `git grep --untracked -n -E`, with **no `\b`** (it silently matches nothing; use `([^A-Za-z_]|$)`). Name the risky call, never a common attribute. Run each one on today's code (silence) and on a planted line (a match) with `phase_tools.py searches`. Every phase carries the searches for the project rules it could break: for example an IMAP `SELECT` or `STORE`, a fetch of `BODY[` without `PEEK`, a provider send or modify call, or a network call to anything but the local model in triage code.
 24. The guide has, in order: Coder ran (files present, progress entry exists, the spec and given files tracked by git), Gates (the acceptance commands), Spot checks, Probe, Searches, Reasonable variations (what is correct even though the spec didn't say it), Verdict format. Spot checks restore by the reverse edit and clear caches before further gates. A stop at the probe's `assert` lines is the probe's fault. A different failure from the "Broken" column is a note, not a finding.
-25. Write both documents directly into `docs/phases/` and `docs/verification/`. Copy the given files from the clone into the repository and compare each byte for byte; check the guide's embedded probe against the probe file.
+25. Write both documents directly into `docs/phases/` and `docs/verification/`. Copy the given files from the clone into the repository and compare each byte for byte; check the guide's embedded probe with `phase_tools.py embedded`.
 
 ### 8. Hand over
 

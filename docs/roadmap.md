@@ -2,14 +2,21 @@
 
 ## Build order and acceptance tests
 
-Status: Phase 0 specified (`docs/phases/phase-00-skeleton.md`); result pending.
+Status: Phase 0 done. Phase 1a specified (`docs/phases/phase-01a-parser-and-store.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
 0. **Skeleton**: the `mailroom` package, the check tooling, and the seams every later phase uses (clock, ids, settings with a private data folder, Keychain reads).
-   Test: 96 given tests pass, critical modules fully covered, `mailroom version` prints `mailroom 0.1.0`.
+   Test: 96 given tests pass, critical modules fully covered, `mailroom version` prints `mailroom 0.1.0`. Done.
 1. **Gmail ingestion, triage and the first-approval Discord message**, with no task creation.
    Test: 30 real emails, including bills and other mail with a `List-Unsubscribe` header, produce sensible verdicts with no actionable email missed; a re-fetch creates no duplicates; Show full text appears only to you and not in the channel history; a button press from another Discord user is ignored; the extractor runs at a usable speed while the Mac's other services are busy.
+   Sub-phases:
+   - **1a** the record, the raw-MIME parser and the SQLite store (dedup, 24-hour clearing). Specified.
+   - **1b** the Gmail adapter, against a fake Gmail.
+   - **1c** sender authentication and the rules.
+   - **1d** the extractor: prompt, schema, validation, a fake model.
+   - **1e** the notify decision and Discord checkpoint 1.
+   - **1f** the poll loop that joins them.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
 3. **Send approved tasks to the real tasks app.**

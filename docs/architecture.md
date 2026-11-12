@@ -33,26 +33,34 @@ The service is the Python package `mailroom` (`src/mailroom/`), with the command
 
 ## Normalized record
 
-Every adapter produces the same record shape, so triage never knows which provider a message came from.
+Every adapter produces the same record shape, so triage never knows which provider a message came from. Each adapter fetches the raw RFC 822 message and supplies the provider, message ID, thread ID, received time and link; one shared parser (`mailroom.mime`) reads the rest from the raw message. The parser never raises and never drops a message: what it cannot read is left empty. Every string from the email is cleaned to plain text and cut to a limit. The record is `mailroom.record.Record`.
 
 | Field | Notes |
 | --- | --- |
 | provider | `gmail`, `outlook` or `yahoo` |
 | message ID | Stable per provider; see [Ingestion](ingestion.md) for how Yahoo's is derived |
 | thread ID | Native for Gmail and Graph; derived from headers for Yahoo |
-| sender | |
-| subject | |
-| received time | |
-| body text | Sent to the local model, and to Discord only as a private reply when you tap Show full text; never to a hosted model |
+| sender | Lower-case address, or empty if missing or malformed; at most 254 characters |
+| sender name | Display name, at most 100 characters; can look like an address, so never trusted |
+| subject | One line, at most 200 characters |
+| received time | When the provider received it |
+| sent time | From the `Date` header, in UTC, or empty; used later to resolve relative deadlines |
+| body text | Plain text (HTML converted, link addresses kept as text), at most 100,000 characters. Sent to the local model, and to Discord only as a private reply when you tap Show full text; never to a hosted model |
 | link | Link to the exact message for Gmail and Outlook; link to the Yahoo inbox for Yahoo |
+| list-unsubscribe | Whether the email has a `List-Unsubscribe` header; lowers the score in triage |
+| authentication results | The `Authentication-Results` headers, read by the sender check |
 
 ## Database
 
-All service state lives in one SQLite database: a single local file, with no separate server to run or secure. It's backed up with the rest of the Mac.
+All service state lives in one SQLite database (`mailroom.sqlite3` in the data folder): a single local file, with no separate server to run or secure. It's backed up with the rest of the Mac.
+
+- **Private.** The file has mode `0o600`, inside the `0o700` data folder.
+- **Cleared text leaves the file.** `secure_delete` is on, so cleared text is overwritten rather than left in free pages, and the default rollback journal is kept, so no write-ahead log holds old text.
+- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it.
 
 | Table | Holds | Kept |
 | --- | --- | --- |
-| messages | Normalized records, including body text, summary and extractor output | Text fields cleared 24 hours after fetch; the row stays as a dedup key |
+| messages | Normalized records, including body text, summary and extractor output | Body text and authentication results (later also the summary and extractor output) cleared 24 hours after fetch; the row stays as a dedup key |
 | threads | Thread ID to task ID mapping | Long term; no email text |
 | items | Each email's approval state, checkpoint and Discord message IDs | Long term; no email text |
 | senders | Trusted and muted lists, sender scores | Long term |

@@ -11,7 +11,7 @@ A phase id is a number with an optional letter: `0`, `1`, `1a`, `12b`. Files use
 ### Before you start
 
 - The spec and its given files are committed and the tree is clean: `git status --short` prints nothing. If it prints anything, stop before writing any code and report the paths it lists; do not work around it.
-- From Phase 1 on: run `.venv/bin/python scripts/check.py`. It must end with `All checks passed.`. Note the number passed in its `tests` step: the spec calls it **N**. In Phase 0 there is no check yet, and N is 0.
+- The spec states **N**: the number of tests the previous phase left passing (in Phase 0, N is 0). From Phase 1 on, the spec's given tests are committed before you start and fail until you build the phase, so `scripts/check.py` cannot pass yet. Instead run the spec's "Start" command: it sets aside the given test files that cannot import yet, and must show the count the spec names, 0 failed.
 
 ### Sections
 

@@ -10,3 +10,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - A leading ~ is expanded with Path.expanduser(), which also expands ~user.
 - Follow-ups:
   - The given files were untracked and five tracked docs were already modified, so git status lists 17 paths, not only the Scope paths.
+
+## Phase 1a: parser and store (2026-11-11)
+- Tests: 96 -> 175 (given 69)
+- New public names: `mime`: `SUBJECT_LIMIT`, `NAME_LIMIT`, `ADDRESS_LIMIT`, `HEADER_LIMIT`, `AUTH_RESULTS_LIMIT`, `BODY_LIMIT`, `clean_line`, `clean_text`, `html_to_text`, `parse_message`; `store`: `DB_FILENAME`, `SCHEMA_MESSAGE`, `TEXT_RETENTION`, `StoreError`, `StoredMessage`, `Store`, `open_store`
+- Changed files: 4
+- Deviations:
+  - If get_content() is not text, or get_payload() raises, the body is empty. If the content type cannot be read, the decoded text is kept as plain text.
+- Follow-ups:
+  - None

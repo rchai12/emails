@@ -1,0 +1,11 @@
+# Which section each test file belongs to, for `scripts/check.py --section NAME` and the table a
+# full run prints. Paths are relative to tests/ and matched with fnmatch. Sections are tried in this
+# order and the first that matches wins; the last, core, takes every file the others leave.
+
+[[section]]
+name = "tooling"
+patterns = ["unit/test_reports*.py"]
+
+[[section]]
+name = "core"
+patterns = ["*"]

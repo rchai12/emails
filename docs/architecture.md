@@ -27,6 +27,10 @@ flowchart LR
 | MCP server | Read-only tools for the email subagent. See [Interfaces](interfaces.md). |
 | Audit log | Records every state change, what triggered it and the original message ID. |
 
+## Package
+
+The service is the Python package `mailroom` (`src/mailroom/`), with the command `mailroom`. Every module reads the current time through `mailroom.clock`, makes ids through `mailroom.ids`, reads settings through `mailroom.config.get_settings()` (variables prefixed `MAILROOM_`), and reads secrets through `mailroom.keychain.get_secret(name)`, which reads the login Keychain item with service `mailroom` and the secret's name as its account. The data folder is `MAILROOM_DATA_DIR`, by default `~/Library/Application Support/mailroom`, kept at mode `0o700` and outside anything iCloud syncs.
+
 ## Normalized record
 
 Every adapter produces the same record shape, so triage never knows which provider a message came from.

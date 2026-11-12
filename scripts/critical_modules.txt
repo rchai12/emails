@@ -1,0 +1,6 @@
+# Modules where a bug lets the service leak a secret or email text, act without approval, or accept
+# output it should refuse. Every line and every branch of each must be covered by tests. One path
+# per line, relative to src/mailroom/. Read by scripts/check.py.
+reports.py
+config.py
+keychain.py

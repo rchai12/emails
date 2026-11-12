@@ -29,6 +29,16 @@ real-emails/
 *.log
 logs/
 
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
+.hypothesis/
+
 # macOS and editors
 .DS_Store
 .vscode/

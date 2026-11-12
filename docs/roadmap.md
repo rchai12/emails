@@ -2,8 +2,12 @@
 
 ## Build order and acceptance tests
 
-Build one stage at a time, and move on only when its test passes.
+Status: Phase 0 specified (`docs/phases/phase-00-skeleton.md`); result pending.
 
+Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
+
+0. **Skeleton**: the `mailroom` package, the check tooling, and the seams every later phase uses (clock, ids, settings with a private data folder, Keychain reads).
+   Test: 96 given tests pass, critical modules fully covered, `mailroom version` prints `mailroom 0.1.0`.
 1. **Gmail ingestion, triage and the first-approval Discord message**, with no task creation.
    Test: 30 real emails, including bills and other mail with a `List-Unsubscribe` header, produce sensible verdicts with no actionable email missed; a re-fetch creates no duplicates; Show full text appears only to you and not in the channel history; a button press from another Discord user is ignored; the extractor runs at a usable speed while the Mac's other services are busy.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.

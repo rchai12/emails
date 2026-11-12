@@ -1,0 +1,46 @@
+[project]
+name = "mailroom"
+version = "0.1.0"
+description = "Reads mail, triages it with a local model, and asks on Discord before anything becomes a task."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic-settings>=2.16,<3",
+    "typer>=0.27,<1",
+    "keyring>=25.7,<26",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1,<10",
+    "pytest-cov>=7.1,<8",
+    "ruff>=0.17,<0.18",
+]
+
+[project.scripts]
+mailroom = "mailroom.cli:app"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mailroom", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib --cov=mailroom --cov-branch --cov-report=term-missing"
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true

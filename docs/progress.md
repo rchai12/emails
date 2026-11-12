@@ -64,3 +64,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1g: Triage result (2026-11-12)
+- Tests: 352 -> 407 (given 51)
+- New public names: `store`: `Verdict`, `StoredTriage`, `save_triage`, `triage`, `untriaged`; `triage`: `should_notify`, `rank`, `triage_message`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

@@ -2,12 +2,13 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Literal, cast
 
 from mailroom import clock
 from mailroom.config import Settings, prepare_data_dir
+from mailroom.extractor import Deadline, Extraction
 from mailroom.record import Record
 from mailroom.schema import MIGRATIONS
 
@@ -43,6 +44,29 @@ SET body_text = NULL, authentication_results = NULL, text_cleared_at = ?
 WHERE text_cleared_at IS NULL AND fetched_at <= ?
 """
 
+_CLEAR_TRIAGE = """
+UPDATE triage
+SET extraction = NULL, text_cleared_at = ?
+WHERE extraction IS NOT NULL
+  AND EXISTS (
+      SELECT 1 FROM messages
+      WHERE messages.provider = triage.provider
+        AND messages.message_id = triage.message_id
+        AND messages.fetched_at <= ?
+  )
+"""
+
+_TRIAGE_INSERT = """
+INSERT INTO triage (
+    provider, message_id, outcome, reason, trusted, verified, bulk, notify,
+    extraction, decided_at, text_cleared_at
+)
+SELECT provider, message_id, ?, ?, ?, ?, ?, ?, ?, ?, NULL
+FROM messages
+WHERE provider = ? AND message_id = ? AND text_cleared_at IS NULL
+ON CONFLICT DO NOTHING
+"""
+
 
 class StoreError(Exception):
     pass
@@ -54,6 +78,52 @@ def _stamp(moment: datetime) -> str:
 
 def _read_time(value: str) -> datetime:
     return datetime.fromisoformat(value)
+
+
+def _dump_extraction(extraction: Extraction) -> str:
+    deadline = extraction.deadline
+    payload: dict[str, object] = {
+        "summary": extraction.summary,
+        "actionable": extraction.actionable,
+        "urgent": extraction.urgent,
+        "title": extraction.title,
+        "deadline": None,
+        "suspicious": extraction.suspicious,
+        "suspicion_reason": extraction.suspicion_reason,
+        "confidence": extraction.confidence,
+    }
+    if deadline is not None:
+        payload["deadline"] = {
+            "date": deadline.date.isoformat(),
+            "time": None if deadline.time is None else deadline.time.isoformat(),
+            "explicit": deadline.explicit,
+            "quote": deadline.quote,
+        }
+    return json.dumps(payload)
+
+
+def _load_extraction(text: str) -> Extraction:
+    payload = json.loads(text)
+    raw = payload["deadline"]
+    deadline = None
+    if raw is not None:
+        raw_time = raw["time"]
+        deadline = Deadline(
+            date=date.fromisoformat(raw["date"]),
+            time=None if raw_time is None else time.fromisoformat(raw_time),
+            explicit=raw["explicit"],
+            quote=raw["quote"],
+        )
+    return Extraction(
+        summary=payload["summary"],
+        actionable=payload["actionable"],
+        urgent=payload["urgent"],
+        title=payload["title"],
+        deadline=deadline,
+        suspicious=payload["suspicious"],
+        suspicion_reason=payload["suspicion_reason"],
+        confidence=payload["confidence"],
+    )
 
 
 def _sender_address(address: str) -> str:
@@ -80,6 +150,24 @@ class StoredMessage:
 class SyncState:
     bookmark: str
     synced_at: datetime
+
+
+@dataclass(frozen=True)
+class Verdict:
+    outcome: Literal["dropped", "extracted", "rejected"]
+    trusted: bool
+    verified: bool
+    bulk: bool
+    notify: bool
+    extraction: Extraction | None = None
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class StoredTriage:
+    verdict: Verdict
+    decided_at: datetime
+    text_cleared_at: datetime | None
 
 
 class Store:
@@ -226,9 +314,74 @@ class Store:
         ).fetchall()
         return tuple(row[0] for row in rows)
 
+    def save_triage(self, provider: str, message_id: str, verdict: Verdict) -> bool:
+        decided_at = _stamp(clock.now())
+        cursor = self._connection.execute(
+            _TRIAGE_INSERT,
+            (
+                verdict.outcome,
+                verdict.reason,
+                1 if verdict.trusted else 0,
+                1 if verdict.verified else 0,
+                1 if verdict.bulk else 0,
+                1 if verdict.notify else 0,
+                None if verdict.extraction is None else _dump_extraction(verdict.extraction),
+                decided_at,
+                provider,
+                message_id,
+            ),
+        )
+        self._connection.commit()
+        return cursor.rowcount == 1
+
+    def triage(self, provider: str, message_id: str) -> StoredTriage | None:
+        row = self._connection.execute(
+            """
+            SELECT outcome, trusted, verified, bulk, notify, extraction, reason,
+                   decided_at, text_cleared_at
+            FROM triage
+            WHERE provider = ? AND message_id = ?
+            """,
+            (provider, message_id),
+        ).fetchone()
+        if row is None:
+            return None
+        outcome, trusted, verified, bulk, notify, extraction, reason, decided_at, cleared = row
+        return StoredTriage(
+            verdict=Verdict(
+                outcome=outcome,
+                trusted=bool(trusted),
+                verified=bool(verified),
+                bulk=bool(bulk),
+                notify=bool(notify),
+                extraction=None if extraction is None else _load_extraction(extraction),
+                reason=reason,
+            ),
+            decided_at=_read_time(decided_at),
+            text_cleared_at=None if cleared is None else _read_time(cleared),
+        )
+
+    def untriaged(self) -> tuple[tuple[str, str], ...]:
+        rows = self._connection.execute(
+            """
+            SELECT messages.provider, messages.message_id
+            FROM messages
+            LEFT JOIN triage
+              ON triage.provider = messages.provider
+             AND triage.message_id = messages.message_id
+            WHERE messages.text_cleared_at IS NULL
+              AND triage.message_id IS NULL
+            ORDER BY messages.received_at, messages.provider, messages.message_id
+            """
+        ).fetchall()
+        return tuple((provider, message_id) for provider, message_id in rows)
+
     def clear_expired_text(self) -> int:
         now = clock.now()
-        cursor = self._connection.execute(_CLEAR, (_stamp(now), _stamp(now - TEXT_RETENTION)))
+        stamp = _stamp(now)
+        cutoff = _stamp(now - TEXT_RETENTION)
+        cursor = self._connection.execute(_CLEAR, (stamp, cutoff))
+        self._connection.execute(_CLEAR_TRIAGE, (stamp, cutoff))
         self._connection.commit()
         return cursor.rowcount
 

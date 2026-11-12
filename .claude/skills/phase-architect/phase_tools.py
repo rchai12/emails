@@ -1,30 +1,50 @@
 """Small jobs the phase-architect checklist repeats, each printing only what the next step needs.
 
-    python3.12 .claude/skills/phase-architect/phase_tools.py searches SPEC [--cwd DIR]
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py searches SPEC [--cwd DIR]
         Run each command of the spec's "### Searches" block in DIR (default: the repository) and
         print how many lines each one matched. Use it on today's code (expect 0s) and on a copy
         with planted lines (expect matches).
 
-    python3.12 .claude/skills/phase-architect/phase_tools.py embedded GUIDE FILE
-        Check that the guide's ```python block is byte for byte the probe FILE (phases 0 and 1a,
-        which embed the probe; later phases commit it as docs/verification/probe-NNx.py).
+    Add --plant FILE to append each `path<TAB>line` of FILE to its file (in --cwd), run the
+        searches, and restore every file exactly; each search should then match.
 
-    python3.12 .claude/skills/phase-architect/phase_tools.py new --id 1b --slug gmail-adapter \
-            --title "Gmail adapter" --n 165 --given tests/unit/test_gmail.py \
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py context MODULE...
+        Print the public outline of each module: signatures, dataclass fields, public constants.
+
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py clone 1h --scratch DIR
+        Make (or remake) DIR/fail01h from the repository with the venv linked, and say whether
+        `mailroom` imports from the clone.
+
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py failcheck CLONE TEST...
+        Run only these tests in the clone and print the summary and each distinct failure reason.
+
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py promote CLONE FILE... \
+            [--ignore TEST...]
+        Copy given files from the clone into the repository, compare each byte for byte, then run
+        the Start command (the whole suite without the --ignore files) and print its last line.
+
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py new --id 1b \
+            --slug gmail-adapter --title "Gmail adapter" --n 165 --given tests/unit/test_gmail.py \
             --create src/mailroom/gmail.py [--sections core] [--out DIR]
         Write a spec skeleton with every fixed section filled; the architect replaces each TODO.
 
-    python3.12 .claude/skills/phase-architect/phase_tools.py guide SPEC [--out FILE]
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py guide SPEC [--out FILE]
         Write the verification guide's fixed parts from a finished spec: Coder ran, Gates, the
         probe section, Searches and Verdict. Spot checks and variations are left as TODO.
 
-It only reads files and runs the spec's own read-only git grep commands.
+Only `clone`, `promote` and `--plant` write files: the clone, the given files, and planted lines
+that are restored before it returns.
 """
 
 import argparse
+import ast
+import filecmp
+import os
 import re
+import shutil
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -60,17 +80,121 @@ def run_searches(spec_path: Path, cwd: Path) -> int:
     return 0
 
 
-def check_embedded(guide_path: Path, file_path: Path) -> int:
-    guide = guide_path.read_text(encoding="utf-8")
-    marker = "```python\n"
-    if marker not in guide:
-        print("no ```python block")
-        return 1
-    start = guide.index(marker) + len(marker)
-    end = guide.index("\n```", start) + 1
-    same = guide[start:end] == file_path.read_text(encoding="utf-8")
-    print("embedded copy identical" if same else "embedded copy DIFFERS")
-    return 0 if same else 1
+def plant_and_search(spec_path: Path, cwd: Path, plant: Path) -> int:
+    planted: dict[Path, list[str]] = {}
+    for line in plant.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            path, text = line.split("\t", 1)
+            planted.setdefault(cwd / path, []).append(text)
+    saved = {path: path.read_bytes() if path.exists() else None for path in planted}
+    try:
+        for path, lines in planted.items():
+            before = (saved[path] or b"").decode()
+            if before and not before.endswith("\n"):
+                before += "\n"
+            path.write_text(before + "\n".join(lines) + "\n", encoding="utf-8")
+        return run_searches(spec_path, cwd)
+    finally:
+        for path, content in saved.items():
+            if content is None:
+                path.unlink()
+            else:
+                path.write_bytes(content)
+        print("planted lines removed")
+
+
+def signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+    return f"def {node.name}({ast.unparse(node.args)}){returns}"
+
+
+def outline(path: Path) -> list[str]:
+    lines = [f"== {path}"]
+    for node in ast.parse(path.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            if not node.name.startswith("_"):
+                lines.append(signature(node))
+        elif isinstance(node, ast.ClassDef):
+            bases = ", ".join(ast.unparse(base) for base in node.bases)
+            lines.append(f"class {node.name}({bases})" if bases else f"class {node.name}")
+            for item in node.body:
+                if isinstance(item, ast.AnnAssign):
+                    lines.append("    " + ast.unparse(item))
+                elif isinstance(item, ast.FunctionDef) and (
+                    not item.name.startswith("_") or item.name == "__init__"
+                ):
+                    lines.append("    " + signature(item))
+        elif isinstance(node, ast.Assign | ast.AnnAssign):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            names = [ast.unparse(target) for target in targets]
+            if all(name[0].isupper() and (name.isupper() or "_" not in name) for name in names):
+                text = ast.unparse(node).replace("\n", " ")
+                lines.append(text if len(text) <= 100 else text[:97] + "...")
+    return lines
+
+
+def clone_env() -> dict[str, str]:
+    return {**os.environ, "PYTHONPATH": "src:.", "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+def make_clone(phase: str, scratch: Path) -> int:
+    dest = scratch.resolve() / f"fail{file_id(phase)}"
+    if dest.exists():
+        shutil.rmtree(dest)
+    subprocess.run(["git", "clone", "-q", str(ROOT), str(dest)], check=True)
+    (dest / ".venv").symlink_to(ROOT / ".venv")
+    found = subprocess.run(
+        [".venv/bin/python", "-c", "import mailroom; print(mailroom.__file__)"],
+        cwd=dest,
+        env=clone_env(),
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    inside = Path(found).resolve().is_relative_to(dest)
+    print(f"{dest}\nmailroom imports from the clone: {'yes' if inside else 'NO: ' + found}")
+    return 0 if inside else 1
+
+
+def fail_check(clone: Path, tests: list[str]) -> int:
+    done = subprocess.run(
+        [".venv/bin/python", "-m", "pytest", "--no-cov", "-q", "-p", "no:cacheprovider", "-rfE"]
+        + ["--tb=line", *tests],
+        cwd=clone,
+        env=clone_env(),
+        capture_output=True,
+        text=True,
+    )
+    lines = done.stdout.splitlines()
+    reasons: Counter[str] = Counter()
+    for line in lines:
+        found = re.fullmatch(r"\S+:[0-9]+: (.*)", line)
+        if found is not None:
+            reasons[found.group(1)[:110]] += 1
+    for reason, count in reasons.most_common():
+        print(f"{count:4}  {reason}")
+    print(lines[-1] if lines else "no output")
+    return 0
+
+
+def promote(clone: Path, files: list[str], ignore: list[str]) -> int:
+    differ = []
+    for name in files:
+        (ROOT / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(clone / name, ROOT / name)
+        if not filecmp.cmp(clone / name, ROOT / name, shallow=False):
+            differ.append(name)
+    print(f"copied {len(files)}; differ: {', '.join(differ) or 'none'}")
+    done = subprocess.run(
+        [".venv/bin/python", "-m", "pytest", "--no-cov", "-q", "-p", "no:cacheprovider"]
+        + [f"--ignore={name}" for name in ignore],
+        cwd=ROOT,
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+    )
+    lines = done.stdout.splitlines()
+    print("Start:", lines[-1] if lines else "no output")
+    return 1 if differ else 0
 
 
 STANDING_SEARCHES = (
@@ -346,9 +470,19 @@ def main() -> int:
     searches = commands.add_parser("searches")
     searches.add_argument("spec", type=Path)
     searches.add_argument("--cwd", type=Path, default=ROOT)
-    embedded = commands.add_parser("embedded")
-    embedded.add_argument("guide", type=Path)
-    embedded.add_argument("file", type=Path)
+    searches.add_argument("--plant", type=Path)
+    context = commands.add_parser("context")
+    context.add_argument("modules", nargs="+", type=Path)
+    clone = commands.add_parser("clone")
+    clone.add_argument("id")
+    clone.add_argument("--scratch", type=Path, required=True)
+    failcheck = commands.add_parser("failcheck")
+    failcheck.add_argument("clone", type=Path)
+    failcheck.add_argument("tests", nargs="+")
+    given = commands.add_parser("promote")
+    given.add_argument("clone", type=Path)
+    given.add_argument("files", nargs="+")
+    given.add_argument("--ignore", nargs="+", default=[])
     new = commands.add_parser("new")
     new.add_argument("--id", required=True)
     new.add_argument("--slug", required=True)
@@ -363,9 +497,19 @@ def main() -> int:
     guide.add_argument("--out", type=Path)
     args = parser.parse_args()
     if args.command == "searches":
+        if args.plant is not None:
+            return plant_and_search(args.spec, args.cwd, args.plant)
         return run_searches(args.spec, args.cwd)
-    if args.command == "embedded":
-        return check_embedded(args.guide, args.file)
+    if args.command == "context":
+        for module in args.modules:
+            print("\n".join(outline(module)))
+        return 0
+    if args.command == "clone":
+        return make_clone(args.id, args.scratch)
+    if args.command == "failcheck":
+        return fail_check(args.clone, args.tests)
+    if args.command == "promote":
+        return promote(args.clone, args.files, args.ignore)
     if args.command == "new":
         name = f"phase-{file_id(args.id)}-{args.slug}.md"
         return write(spec_skeleton(args), target(args.out, name))

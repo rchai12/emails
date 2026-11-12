@@ -19,20 +19,17 @@ The design lives in `docs/`: purpose and scope, decisions, architecture, ingesti
 
 ## Tools (all in this folder)
 
-Build them as the codebase grows, so each phase costs fewer steps and fewer tokens than the last. Current tools:
+Run each with `.venv/bin/python`; `phase_tools.py` explains its commands in its docstring.
 
-- `phase_status.py`: step 1's facts in one run: tree state, last commits, specs without a review, the latest progress entry, the newest review's head, and the public names the last phase added. Run `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python .claude/skills/phase-architect/phase_status.py` (`python3.12` before `.venv` exists).
-- `phase_tools.py searches SPEC [--cwd DIR]`: runs each command of the spec's `### Searches` block and prints its match count. Run it on the repository (expect 0s) and with `--cwd` on the `fail<NN>` clone with planted lines (expect matches).
-- `phase_tools.py embedded GUIDE FILE`: checks a guide's embedded probe against the probe file (phases 0 and 1a only; later probes are committed files).
-- `phase_tools.py new --id ID --slug SLUG --title TITLE --n N --given PATHS --create PATHS --out DIR`: writes the spec skeleton with every fixed section filled (Start command, Given files and Scope tables, Acceptance rows, the standing searches); replace each `TODO`.
-- `phase_tools.py guide SPEC --out FILE`: writes the guide's fixed parts from the finished spec (Coder ran with the baseline check, Gates from Acceptance, the probe section, the Searches table, Verdict); write the `TODO`s: spot checks, the probe line, each search's rule, reasonable variations.
+- `phase_status.py`: step 1's facts in one run (tree, commits, unreviewed specs, last progress entry, newest review, last phase's public names).
+- `phase_tools.py context MODULE...`: a module's signatures, dataclass fields and public constants.
+- `phase_tools.py clone ID --scratch DIR`: the `fail<NN>` clone, venv linked, imports checked.
+- `phase_tools.py failcheck CLONE TEST...`: the given tests' count and distinct failure reasons.
+- `phase_tools.py promote CLONE FILE... --ignore TEST...`: given files into the repository, compared, then the Start count.
+- `phase_tools.py new ...` and `guide SPEC --out FILE`: the spec skeleton and the guide's fixed parts; fill each `TODO`.
+- `phase_tools.py searches SPEC [--cwd DIR] [--plant FILE]`: each search's match count; `--plant` adds `path<TAB>line` lines, runs, restores.
 
-- **When to build one.** A manual step done the same way in two phases becomes a script before the third. A step that went wrong because it was done by hand (a miscounted test total, an embedded copy that drifted, a restore that missed a file) becomes a script at once.
-- **Likely next tools,** in roughly the order they'll earn their place:
-  - a spot-check runner: makes one exact-text edit (exactly one match, or it stops), runs one test, prints the failure lines, restores the file and clears caches
-  - a probe skeleton with the self-check, the wrapped checks and the `FAILURES N` summary already in place
-- **Rules for tools.** Each one does one job, prints only what the next step needs (short output saves tokens), and passes the project's linter and formatter. Use the language and runner phase 00 chose. A tool that reads project files is updated in the same phase that changes their layout.
-- **Keep this list current.** When a tool is added, list it here with one line on what it does, and replace the manual instruction in the checklist with the command. Remove a tool that stops being used.
+A step done by hand in two phases, or one that went wrong by hand, becomes a tool: one job, quiet output, linted. Keep this list to one line per tool.
 
 ## Layout
 
@@ -47,19 +44,7 @@ Build them as the codebase grows, so each phase costs fewer steps and fewer toke
 
 Phases follow the build order in `docs/roadmap.md`: stage N is phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big. A phase id is unpadded (`0`, `1a`) in headings (`## Phase 1a: `, `# Review: Phase 1a`); file names pad it to two digits (`phase-01a-<slug>.md`). `scripts/check_reports.py` enforces this.
 
-**Given files are committed with the spec**, not embedded in it: you place them in the repository at their paths (copied from the `fail<N>` clone and compared byte for byte), the owner commits them with the spec, and the acceptance and the guide check `git diff HEAD --stat -- <given files>` prints nothing. Only the probe is embedded, in the guide, because the verifier runs it from outside the repository. Scratch work lives in the session scratchpad: given files under `<scratch>/pNN/` at their repository paths, the `fail<NN>` clone, and drafts of the spec and guide.
-
-## Phase 00: project skeleton
-
-Phase 00 comes first. If `AGENTS.md`, `docs/testing.md` or `docs/phase-conventions.md` is missing, or the folder is not a git repository, the next phase is 00, whatever the roadmap says. Phase 00 settles, with the owner:
-
-- language, package manager, test runner, linter and formatter, and the one command (`scripts/check`) that runs them all
-- `AGENTS.md`: the project rules below, written for the coder
-- `docs/testing.md`: how to run tests, coverage, the fakes, and the rule that no test touches a real mailbox, model, Discord or tasks app
-- `docs/phase-conventions.md`: progress entry format, commit expectations, what "done" means
-- the fakes every later phase needs: mail providers, the local model, Discord, the tasks app, the Keychain, and the clock
-
-Until phase 00 exists, the commands in this checklist that name project tooling mean "the command phase 00 will define". Phase 00 also writes the first architect tool, the status script, since step 1 runs every turn.
+**Given files (the probe included) are committed with the spec**, never embedded in it: built in the `fail<NN>` clone, placed with `promote`, committed by the owner, and guarded by `git diff HEAD --stat -- <given files>` printing nothing. Scratch work (the clone, drafts) lives in the session scratchpad. Phase 0 (the skeleton, `AGENTS.md`, testing and conventions docs, the fakes) is done.
 
 ## Checklist
 
@@ -70,7 +55,8 @@ Phase 1a cost the most of any phase so far: it was twice the size limit, its pro
 - **Quiet output.** A test run prints counts grouped by reason (`--tb=line -q 2>&1 | grep '^E ' | sort | uniq -c`) or its last lines (`| tail -3`), never the full list of failures or collected tests. Long files are read by range, not whole.
 - **Facts before files.** Every spike, and every fuzz of a library whose exceptions the spec must handle, runs before the first test is written. Error rules are settled before any expected value depends on them.
 - **Decide once.** Test ids, literal expected values and the final formatting go into a test the first time it is written, never in a second pass.
-- **Write each thing once.** The probe is a committed given file, never copied into the guide; the guide's fixed sections come from `phase_tools.py guide`, the spec's from `phase_tools.py new`.
+- **Write each thing once.** The guide's fixed sections come from `phase_tools.py guide`, the spec's from `phase_tools.py new`.
+- **One session per phase.** `phase_status.py`, `history.md` and the docs carry everything across; a long session re-reads its whole history every turn.
 
 ### 1. Start (every turn that mentions a phase)
 
@@ -78,12 +64,12 @@ Phase 1a cost the most of any phase so far: it was twice the size limit, its pro
 2. A review that lists every file as absent means the coder never ran: tell the owner to run the coder, and do not change the spec. A FAIL whose only findings come from an uncommitted baseline (given files untracked, a dirty tree before the coder started) is neither the spec's fault nor the code's: compare each given file with the clean `fail<NN>` copy (`cmp`), commit the baseline without the coder's files (stage a coder-appended file such as `docs/progress.md` at its given content), leave the coder's work uncommitted, and have the verifier re-run.
 3. A FAIL review: read it. If my spec caused it, add a "Corrections" section to the spec, keep the coder's code, and re-run each corrected spot-check row against the committed code before publishing. If the code caused it, it goes back to the coder; never bend the spec to fit wrong code.
 4. Record the last phase's result in `history.md` (replace "result pending"). Turn each miss into a line of this checklist, or sharpen an existing line. Never only log it.
-5. Read only what the phase touches, by section (`grep -n '^#' <doc>`, then that range): the roadmap row, the progress entries' deviations, the rules of `AGENTS.md` that bite in this phase, the design docs the phase touches, and the code the phase touches (quote real names and signatures, never ones a spec only planned).
+5. Read only what the phase touches, by section (`grep -n '^#' <doc>`, then that range): the roadmap row, the progress entries' deviations, the rules of `AGENTS.md` that bite in this phase, and the design docs the phase touches. For code, start from `phase_tools.py context` (quote real names and signatures, never ones a spec only planned); read a body only where a test depends on its details. Don't re-read an earlier spec for its layout.
 
 ### 2. Decide
 
-6. Size: at most about 10 requirements, 30 given tests (counting each parameter set and tests of given code), 3 to 5 public units. **This is a limit, not a guide**: over it, split into lettered sub-phases before writing any test, and never note the overrun and carry on (phase 1a did). A new provider adapter is usually its own sub-phase.
-7. Ask the owner the design questions (AskUserQuestion, a recommended option first in each). Check any claim about another project, a provider API or a library in its code, its documentation, or on the machine first. A question the design docs already answer is not asked again.
+6. Size: at most about 10 requirements, 3 to 5 public units, and 30 given test functions (parameter rows of one pure function's contract count once per function, not per row). **This is a limit, not a guide**: over it, split into lettered sub-phases before writing any test, and never note the overrun and carry on (phase 1a did). A new provider adapter is usually its own sub-phase.
+7. Ask the owner only what the design docs leave open (AskUserQuestion, short options, a recommended one first). Check any claim about another project, a provider API or a library in its code, its documentation, or on the machine first.
 8. **Decide what is given and what the coder writes, before writing any file.** Given: contracts that must not drift: the normalized record, the extractor's JSON schema and prompt text, the database schema, the tasks app payload, Discord message layouts and button ids, exact user-facing messages, and fakes checked against the real provider's response shape. The coder must have real work, and the given tests must fail before it.
 9. Before changing earlier behaviour or adding to a list earlier tests enumerate: `git grep` the tests for its names, messages, and values, and give an edit for each test that pins it.
 10. Check the limits the new code meets: task titles at most 100 characters, Discord's message and button limits, the 24-hour retention rule for any new field holding email text, and the strictness of the contracts it extends.
@@ -94,12 +80,11 @@ Phase 1a cost the most of any phase so far: it was twice the size limit, its pro
 
 ### 4. Given tests, in the `fail<NN>` clone
 
-12. Make the clone first (`git clone -q . <scratch>/fail<NN>`) and work only inside it: run the formatter and linter from inside it, with every module the phase creates present as an empty stub (or only its given part), and make sure imports resolve to the clone, not the main repository.
+12. Make the clone first (`phase_tools.py clone`) and work only inside it, with every module the phase creates present as an empty stub (or only its given part). Before placing a shared type, check which way imports already run (`rules.py` imports `store.py`).
 13. **Never build the feature in the clone.** Signs of drift, any one of which means stop: running the whole suite or `scripts/check` there, a scratch source diff of more than about 30 lines beyond the given parts, or confirming a spot check or an expected value by running new code.
-14. Write tests in their final formatted shape, and edit them by exact text with an asserted single match, never with `sed` regexes. The shell is zsh: loop over an array (`files=(a b); for f in "${files[@]}"`), never an unquoted string variable, which zsh does not split.
-14a. Until `src/mailroom/__init__.py` exists the linter needs `known-first-party`; it is set in `pyproject.toml`. Run the linter and format check on the repository (read-only, `--no-cache`) as well as in the clone, since a stub present only in the clone can hide a problem.
-15. Parametrized cases get readable `ids=` (the guide names tests by id). Expected values are literal. Ids are read from the output, never counter values. Times come from the fake clock, never the wall clock. A case that varies a base changes one field, and each refusal case is read against the base for a second, unintended difference.
-16. Fail check: run only the given tests; each fails for the right reason (the missing behaviour, not a typo). Lines after a test's first failing assertion never run, so check every attribute and method they use against the real class. Then run the whole suite in the repository as the coder will find it: given test files that cannot import yet stop collection, so the spec's "Start" command `--ignore`s them and names the count that remains.
+14. Write tests in their final formatted shape, and edit them with the Edit tool (exact text, one match), never `sed` regexes or quoted heredocs. Lint and format-check in the clone and again on the repository after `promote`, since a clone-only stub can hide a problem.
+15. Parametrized cases get readable `ids=` (the guide names tests by id). Expected values are literal. Ids are read from the output, never counter values. Times come from the fake clock, and a `fixed_times` list holds one entry per clock read the spec allows, refused retries included. A case that varies a base changes one field, and each refusal case is read against the base for a second, unintended difference.
+16. Fail check with `phase_tools.py failcheck`: each test fails for the right reason (the missing behaviour, not a typo). Lines after a test's first failing assertion never run, so check every attribute and method they use against the real class. Then `promote` and read the Start count: the given test files that cannot import yet are the `--ignore`s.
 17. Every requirement has a given test, or a "Tests to write" bullet with its deciding input.
 
 ### 5. Probe
@@ -115,15 +100,15 @@ Phase 1a cost the most of any phase so far: it was twice the size limit, its pro
 
 21. Start the spec with `phase_tools.py new` and fill its `TODO`s. The spec has, in order: Goal, Facts, Owner's decisions, Architect's decisions, Requirements (numbered), Given files, Tests to write, Out of scope, Rules that bite, Acceptance. It fixes every public name and message, separates the owner's decisions from the architect's, names in "Out of scope" what a capable coder would over-deliver (a second provider, retries nobody asked for, a nicer Discord layout), and restates the project rules that bite in this phase.
 22. Acceptance: the Start command and its count; at least N + given tests passed; the given files' exact test count; the coverage command; `grep -c "^## Phase <id>: " docs/progress.md` printing `1`; `scripts/check_reports.py --phase <id>`; the searches; `git diff HEAD --stat -- <given files>` printing nothing.
-23. Searches use `git grep --untracked -n -E`, with **no `\b`** (it silently matches nothing; use `([^A-Za-z_]|$)`). Name the risky call, never a common attribute. Run each one on today's code (silence) and on a planted line (a match) with `phase_tools.py searches`. Every phase carries the searches for the project rules it could break: for example an IMAP `SELECT` or `STORE`, a fetch of `BODY[` without `PEEK`, a provider send or modify call, or a network call to anything but the local model in triage code.
+23. Searches use `git grep --untracked -n -E`, with **no `\b`** (it silently matches nothing; use `([^A-Za-z_]|$)`). Name the risky call, never a common attribute. Run each on the clone with legitimate-looking code (silence), then with `--plant` (a match each). Every phase carries the searches for the project rules it could break: for example an IMAP `SELECT` or `STORE`, a fetch of `BODY[` without `PEEK`, a provider send or modify call, or a network call to anything but the local model in triage code.
 24. Generate the guide with `phase_tools.py guide SPEC --out <scratch>/guide.md`, then write its `TODO`s. The guide has, in order: Coder ran (files present, progress entry exists, the spec and given files tracked by git), Gates (the acceptance commands), Spot checks, Probe, Searches, Reasonable variations (what is correct even though the spec didn't say it), Verdict format. Spot checks restore by the reverse edit and clear caches before further gates. A stop at the probe's `assert` lines is the probe's fault. A different failure from the "Broken" column is a note, not a finding.
-25. Write both documents directly into `docs/phases/` and `docs/verification/`. Copy the given files from the clone into the repository and compare each byte for byte; check the guide's embedded probe with `phase_tools.py embedded`.
+25. Write both documents directly into `docs/phases/` and `docs/verification/`.
 
 ### 8. Hand over
 
 26. Update the roadmap's status line and row, `docs/architecture.md` and any other design doc the phase changes, memory (the owner's decisions), and `history.md` ("specified; result pending").
 27. Look back over this phase's work: which steps were repeated by hand, took the most tool calls, or went wrong? Build or extend a tool for it now (see Tools), or note it in `history.md` if it first needs a second occurrence.
-28. Report: both paths, what was decided on the owner's behalf, the spikes, any "Verify before building" items, any tool built or changed, the coder and verifier prompts, and that the owner commits first, so the coder starts from a clean tree. Offer to make that commit, and ask for a yes before the coder prompt is used: an uncommitted baseline blinds the verifier's diff gates (phase 0).
+28. Report briefly (the spec holds the detail): both paths, what was decided on the owner's behalf, the spikes, any "Verify before building" items, any tool built or changed, the coder and verifier prompts, and that the owner commits first, so the coder starts from a clean tree. Offer to make that commit, and ask for a yes before the coder prompt is used: an uncommitted baseline blinds the verifier's diff gates (phase 0).
 
 > Coder: Read AGENTS.md, docs/architecture.md, docs/testing.md, docs/phase-conventions.md, docs/progress.md, and docs/phases/phase-NNx-<slug>.md. Implement only that phase. Run every command under "Acceptance" before you report, and write the progress entry.
 

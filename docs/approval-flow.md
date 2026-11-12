@@ -20,7 +20,7 @@ The double-bordered boxes are your decisions; everything else is automatic. This
 
 ## Checkpoint 1: is this a task?
 
-The Discord message shows the sender, subject, a short local summary and a link. For Gmail and Outlook the link opens the exact email; for Yahoo it opens your Yahoo inbox. It never includes the body.
+The Discord message is a card showing the sender, subject, a short local summary and the proposed title, each inside a code block so nothing in the email can format text, make a link or mention anyone, and an Open email button. For Gmail and Outlook the link opens the exact email; for Yahoo it opens your Yahoo inbox. It never includes the body.
 
 | Button | Result |
 | --- | --- |

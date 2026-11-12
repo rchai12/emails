@@ -13,3 +13,5 @@ sender_auth.py
 rules.py
 extractor.py
 triage.py
+checkpoint.py
+discord_post.py

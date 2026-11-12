@@ -67,6 +67,18 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK (outcome != 'extracted' OR ((extraction IS NULL) = (text_cleared_at IS NOT NULL)))
     ) STRICT;
     """,
+    """
+    CREATE TABLE posts (
+        item_id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        queued_at TEXT NOT NULL,
+        discord_message_id TEXT,
+        posted_at TEXT,
+        UNIQUE (provider, message_id),
+        CHECK ((discord_message_id IS NULL) = (posted_at IS NULL))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

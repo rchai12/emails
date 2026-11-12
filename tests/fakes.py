@@ -379,3 +379,130 @@ class FakeOllama:
                 "eval_count": 120,
             },
         )
+
+
+class FakeDiscord:
+    """Discord's REST API v10 Create Message, for httpx.MockTransport, checked against the docs.
+
+    `POST /api/v10/channels/<channel_id>/messages` with `Authorization: Bot <token>` and a
+    `DiscordBot (...)` User-Agent. The body is checked against the documented limits: content 2000,
+    nonce 25, 10 embeds with title 256, description 4096, 25 fields (name 256, value 1024), footer
+    2048 and 6000 in all; at most 5 action rows of at most 5 buttons; a button's label at most 80;
+    a non-link button needs a unique `custom_id` of 1 to 100 and no `url`; a link button (style 5)
+    needs a `url` of at most 512 and no `custom_id`. A breach answers 400 with code 50035. With
+    `enforce_nonce` and a nonce already used, the existing message is returned and nothing is made.
+
+    Each entry of `failures` answers one request before any check: an exception is raised, a
+    response is returned, and "lost-reply" creates the message and then raises `ReadTimeout`, as
+    if the reply were lost. `messages` holds every message made; `requests` every request.
+    """
+
+    API = "https://discord.com/api/v10"
+
+    def __init__(self) -> None:
+        self.token = "discord-token-test"
+        self.channel_id = "111111111111111111"
+        self.messages: list[dict] = []
+        self.requests: list[httpx.Request] = []
+        self.failures: list[object] = []
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        lost = False
+        if self.failures:
+            failure = self.failures.pop(0)
+            if isinstance(failure, Exception):
+                raise failure
+            if isinstance(failure, httpx.Response):
+                return failure
+            lost = failure == "lost-reply"
+        if request.headers.get("authorization") != f"Bot {self.token}":
+            return httpx.Response(401, json={"message": "401: Unauthorized", "code": 0})
+        if not request.headers.get("user-agent", "").startswith("DiscordBot ("):
+            return httpx.Response(403, text="error code: 1010")
+        path = f"/api/v10/channels/{self.channel_id}/messages"
+        if request.method != "POST" or request.url.path != path:
+            return httpx.Response(404, json={"message": "Unknown Channel", "code": 10003})
+        body = json.loads(request.content)
+        problem = self._problem(body)
+        if problem:
+            return httpx.Response(
+                400, json={"message": "Invalid Form Body", "code": 50035, "errors": problem}
+            )
+        if body.get("enforce_nonce") and body.get("nonce") is not None:
+            for message in self.messages:
+                if message["nonce"] == body["nonce"]:
+                    return httpx.Response(200, json=message)
+        message = {
+            "id": str(1300000000000000001 + len(self.messages)),
+            "channel_id": self.channel_id,
+            "type": 0,
+            "content": body.get("content", ""),
+            "embeds": body.get("embeds", []),
+            "components": body.get("components", []),
+            "nonce": body.get("nonce"),
+            "timestamp": "2026-11-12T09:00:00.000000+00:00",
+        }
+        self.messages.append(message)
+        if lost:
+            raise httpx.ReadTimeout("reply lost")
+        return httpx.Response(200, json=message)
+
+    @staticmethod
+    def _problem(body: dict) -> str:
+        if not (body.get("content") or body.get("embeds") or body.get("components")):
+            return "empty message"
+        if len(body.get("content", "")) > 2000:
+            return "content"
+        nonce = body.get("nonce")
+        if nonce is not None and (not isinstance(nonce, str | int) or len(str(nonce)) > 25):
+            return "nonce"
+        mentions = body.get("allowed_mentions", {"parse": []})
+        if not set(mentions.get("parse", [])) <= {"roles", "users", "everyone"}:
+            return "allowed_mentions"
+        embeds = body.get("embeds", [])
+        total = 0
+        if len(embeds) > 10:
+            return "embeds"
+        for embed in embeds:
+            limits = [("title", 256), ("description", 4096)]
+            for key, limit in limits:
+                if len(embed.get(key, "")) > limit:
+                    return f"embed {key}"
+                total += len(embed.get(key, ""))
+            fields = embed.get("fields", [])
+            if len(fields) > 25:
+                return "embed fields"
+            for field in fields:
+                if not 0 < len(field["name"]) <= 256 or not 0 < len(field["value"]) <= 1024:
+                    return "embed field"
+                total += len(field["name"]) + len(field["value"])
+            footer = embed.get("footer", {}).get("text", "")
+            if len(footer) > 2048:
+                return "embed footer"
+            total += len(footer)
+        if total > 6000:
+            return "embeds total"
+        rows = body.get("components", [])
+        if len(rows) > 5:
+            return "components"
+        seen: set[str] = set()
+        for row in rows:
+            buttons = row.get("components", [])
+            if row.get("type") != 1 or not 0 < len(buttons) <= 5:
+                return "action row"
+            for button in buttons:
+                if button.get("type") != 2 or button.get("style") not in (1, 2, 3, 4, 5):
+                    return "button"
+                if len(button.get("label", "")) > 80:
+                    return "button label"
+                if button["style"] == 5:
+                    url = button.get("url", "")
+                    if "custom_id" in button or not 0 < len(url) <= 512:
+                        return "link button"
+                else:
+                    custom_id = button.get("custom_id", "")
+                    if "url" in button or not 0 < len(custom_id) <= 100 or custom_id in seen:
+                        return "button custom_id"
+                    seen.add(custom_id)
+        return ""

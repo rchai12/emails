@@ -63,7 +63,8 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 | messages | Normalized records, including body text | Body text and authentication results cleared 24 hours after fetch; the row stays as a dedup key |
 | triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, and the extractor output (summary, title, deadline, quote, spam reason) | Extractor output cleared with the email's text, 24 hours after fetch; the verdict stays |
 | threads | Thread ID to task ID mapping | Long term; no email text |
-| items | Each email's approval state, checkpoint and Discord message IDs | Long term; no email text |
+| posts | Each notified email's item id, when it was queued, and its Discord message ID once posted | Long term; no email text |
+| items | Each email's answers and checkpoint (Phase 1i) | Long term; no email text |
 | senders | Trusted and muted lists, sender scores | Long term |
 | sync_state | Each account's sync bookmark and last successful poll | Long term |
 | audit_log | Every state change, what triggered it and the message ID | Long term; no email text |

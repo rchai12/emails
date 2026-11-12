@@ -6,6 +6,7 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 
 - Gmail API with the read-only scope, over plain REST calls (httpx). Each account has a short name (such as `personal`); its OAuth client ID, client secret and refresh token are Keychain items `gmail.<account>.client-id`, `.client-secret` and `.refresh-token`.
 - New mail is found by polling with a stored history ID, filtered to the inbox. A message added to the inbox later (for example one you move out of spam) counts as new.
+- **Login.** `mailroom gmail-login <account>` opens Google's consent page and receives the answer on a one-request listener on 127.0.0.1 (PKCE, 5-minute limit). The first time, it asks for the OAuth client ID and secret (hidden input); `--new-client` replaces them. Only a token for exactly the read-only scope is stored, and nothing is stored unless the whole sign-in succeeds. It finishes by showing the account's address.
 - **First run.** With no history ID yet, the service reads the last 3 days of the inbox, then starts the bookmark.
 - **Still in the inbox.** A message is stored only if, when it is fetched, it is still in the inbox and not in spam or trash. Mail you archive or delete within the minute before a poll is skipped, and a deleted message never blocks the sync.
 - **Link.** `https://mail.google.com/mail/?authuser=<address>#all/<message id>`, so the right account opens when several Google accounts are signed in. **Verify before building:** the link opens the exact message in a desktop browser and on the phone.

@@ -22,6 +22,8 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Accounts | One per provider in v1, every secret and bookmark keyed by an account name | A second account later is configuration, not code | A single fixed account |
 | Mail gone before fetch | Skipped: only mail still in the inbox (not spam or trash) when fetched is stored | You've already dealt with it; a deleted message can't block the sync | Triaging anything that was ever in the inbox |
 | Gmail link | `authuser=<address>` picks the account | Opens the right mailbox with several Google accounts signed in | `u/0`, the first signed-in account |
+| Gmail login | A one-request listener on 127.0.0.1 receives Google's answer, with PKCE | What Google expects for desktop apps; no pasting | Pasting the redirect address |
+| OAuth client keys | The login asks for them (hidden) when missing and stores them | No manual Keychain step | Adding them with `security` by hand |
 | First run | Read the last 3 days of the inbox | Recent mail may still need action; older mail you've already seen | Start from now; 14 days |
 | Parsing | Each adapter fetches the raw RFC 822 message; one shared parser builds the record | One code path gives identical records for identical emails | Mapping each provider's JSON separately |
 | HTML email | Standard library `html.parser`, link addresses kept as plain text | No dependency parsing untrusted input; the model and you see where links point | An HTML-to-text package |

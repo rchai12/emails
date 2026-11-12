@@ -29,7 +29,7 @@ flowchart LR
 
 ## Package
 
-The service is the Python package `mailroom` (`src/mailroom/`), with the command `mailroom`. Every module reads the current time through `mailroom.clock`, makes ids through `mailroom.ids`, reads settings through `mailroom.config.get_settings()` (variables prefixed `MAILROOM_`), and reads secrets through `mailroom.keychain.get_secret(name)`, which reads the login Keychain item with service `mailroom` and the secret's name as its account. The data folder is `MAILROOM_DATA_DIR`, by default `~/Library/Application Support/mailroom`, kept at mode `0o700` and outside anything iCloud syncs.
+The service is the Python package `mailroom` (`src/mailroom/`), with the command `mailroom`. Every module reads the current time through `mailroom.clock`, makes ids through `mailroom.ids`, reads settings through `mailroom.config.get_settings()` (variables prefixed `MAILROOM_`), and reads secrets through `mailroom.keychain.get_secret(name)`, which reads the login Keychain item with service `mailroom` and the secret's name as its account. The only writer is the login command, through `mailroom.keychain.set_secret(name, value)`. The data folder is `MAILROOM_DATA_DIR`, by default `~/Library/Application Support/mailroom`, kept at mode `0o700` and outside anything iCloud syncs.
 
 ## Normalized record
 

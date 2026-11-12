@@ -1,6 +1,7 @@
 """Fakes for systems tests must never reach. They import nothing from mailroom."""
 
 import base64
+import hashlib
 
 import httpx
 from keyring.backend import KeyringBackend
@@ -10,13 +11,15 @@ from keyring.compat import properties
 class FakeKeychain(KeyringBackend):
     """An in-memory keychain. `secrets` maps (service, name) to a value.
 
-    `calls` records every (service, name) asked for. When `error` is set, every call raises it.
+    `calls` records every (service, name) asked for and `writes` every one stored. When `error` is
+    set, every call raises it.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self.secrets: dict[tuple[str, str], str] = {}
         self.calls: list[tuple[str, str]] = []
+        self.writes: list[tuple[str, str]] = []
         self.error: Exception | None = None
 
     @properties.classproperty
@@ -30,7 +33,10 @@ class FakeKeychain(KeyringBackend):
         return self.secrets.get((service, username))
 
     def set_password(self, service: str, username: str, password: str) -> None:
-        raise AssertionError("mailroom never writes to the keychain in this phase")
+        if self.error is not None:
+            raise self.error
+        self.writes.append((service, username))
+        self.secrets[(service, username)] = password
 
     def delete_password(self, service: str, username: str) -> None:
         raise AssertionError("mailroom never deletes from the keychain in this phase")
@@ -64,6 +70,8 @@ class FakeGmail:
         self.history: list[dict[str, object]] = []
         self.page_size: int | None = None
         self.expires_in = 3599
+        self.granted_scope = "https://www.googleapis.com/auth/gmail.readonly"
+        self.codes: dict[str, dict[str, str]] = {}
         self.issued: list[str] = []
         self.valid: set[str] = set()
         self.failures: list[httpx.Response | Exception] = []
@@ -95,6 +103,39 @@ class FakeGmail:
         message["labelIds"] = current + list(labels)
         thread = str(message["threadId"])
         self._record("labelsAdded", message_id, thread, list(message["labelIds"]), list(labels))
+
+    def consent(self, url: str, *, approve: bool = True) -> str:
+        """Google's consent page: check the request, and return where it sends the browser.
+
+        An approved consent gives a one-time code, kept with the request's PKCE challenge and
+        redirect address; the token endpoint checks both when the code is exchanged.
+        """
+        request = httpx.URL(url)
+        params = request.params
+        expected = {
+            "client_id": self.client_id,
+            "response_type": "code",
+            "scope": "https://www.googleapis.com/auth/gmail.readonly",
+            "code_challenge_method": "S256",
+        }
+        assert (request.scheme, request.host, request.path) == (
+            "https",
+            "accounts.google.com",
+            "/o/oauth2/v2/auth",
+        ), "not Google's consent page"
+        for key, value in expected.items():
+            assert params.get_list(key) == [value], f"consent request: {key}"
+        for key in ("redirect_uri", "code_challenge", "state"):
+            assert len(params.get_list(key)) == 1, f"consent request: {key}"
+        redirect = params["redirect_uri"]
+        if not approve:
+            return str(
+                httpx.URL(redirect, params={"error": "access_denied", "state": params["state"]})
+            )
+        code = f"code-{len(self.codes) + 1}"
+        self.codes[code] = {"challenge": params["code_challenge"], "redirect_uri": redirect}
+        answer = {"state": params["state"], "code": code, "scope": self.granted_scope}
+        return str(httpx.URL(redirect, params=answer))
 
     def invalidate_tokens(self) -> None:
         """Every access token issued so far now gets 401."""
@@ -163,6 +204,8 @@ class FakeGmail:
 
     def _token(self, request: httpx.Request) -> httpx.Response:
         form = dict(httpx.QueryParams(request.content.decode()))
+        if form.get("grant_type") == "authorization_code":
+            return self._exchange(request, form)
         expected = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -183,6 +226,40 @@ class FakeGmail:
                 "access_token": token,
                 "expires_in": self.expires_in,
                 "scope": "https://www.googleapis.com/auth/gmail.readonly",
+                "token_type": "Bearer",
+            },
+        )
+
+    def _exchange(self, request: httpx.Request, form: dict[str, str]) -> httpx.Response:
+        """The authorization-code grant: a code is used once, with its PKCE verifier."""
+        grant = self.codes.pop(form.get("code", ""), None)
+        verifier = form.get("code_verifier", "")
+        digest = hashlib.sha256(verifier.encode()).digest()
+        challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+        keys = {"code", "client_id", "client_secret", "redirect_uri", "grant_type", "code_verifier"}
+        if (
+            request.method != "POST"
+            or set(form) != keys
+            or grant is None
+            or (form["client_id"], form["client_secret"]) != (self.client_id, self.client_secret)
+            or form["redirect_uri"] != grant["redirect_uri"]
+            or challenge != grant["challenge"]
+        ):
+            return httpx.Response(
+                400,
+                json={"error": "invalid_grant", "error_description": "Bad Request"},
+            )
+        self.refresh_token = f"refresh-token-from-{form['code']}"
+        token = f"access-{len(self.issued) + 1}"
+        self.issued.append(token)
+        self.valid.add(token)
+        return httpx.Response(
+            200,
+            json={
+                "access_token": token,
+                "expires_in": self.expires_in,
+                "refresh_token": self.refresh_token,
+                "scope": self.granted_scope,
                 "token_type": "Bearer",
             },
         )

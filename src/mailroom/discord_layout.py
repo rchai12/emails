@@ -1,4 +1,4 @@
-"""The checkpoint 1 message: its fixed text, colors, buttons and button ids.
+"""The checkpoint 1 message, its answered form, the replies and the title form.
 
 `mailroom.checkpoint` builds the message from these. A button's `custom_id` is
 `<PREFIX>:<action>:<item id>`; Phase 1i reads it back, so the actions and the prefix never change.
@@ -52,3 +52,33 @@ FOOTER_JOIN = " · "
 
 BACKTICK = "`"
 BACKTICK_STAND_IN = "ˋ"
+
+# Phase 1i: answering. Interaction response types and the ephemeral flag, from Discord's reference.
+CHANNEL_MESSAGE = 4
+DEFERRED_UPDATE = 6
+UPDATE_MESSAGE = 7
+MODAL = 9
+EPHEMERAL = 64
+
+ANSWER_NAME = "Your answer"
+ANSWER_TEXT = {
+    "yes": "Yes, it's a task",
+    "edit": "Yes, with your title",
+    "notask": "Not a task",
+    "mute": "Not a task; sender muted",
+}
+
+FORM_ACTION = "title"
+FORM_TITLE = "Edit task title"
+FORM_LABEL = "Task title"
+FORM_INPUT_ID = "title"
+FORM_TITLE_LIMIT = 100
+
+FULL_LIMIT = 1900
+FULL_CUT_NOTE = "The email is longer than Discord allows; use Open email to read the rest."
+FULL_EMPTY = "(no text)"
+FULL_EXPIRED = "The email text was deleted after 24 hours; use Open email to read it."
+ALREADY_TEXT = "This email is already answered."
+NO_SENDER_TEXT = "This email has no sender address."
+TRUSTED_REPLY = "Added to your trusted senders:"
+BAD_TITLE_TEXT = "A title needs 1 to 100 characters on one line."

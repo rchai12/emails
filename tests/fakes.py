@@ -395,6 +395,19 @@ class FakeDiscord:
     Each entry of `failures` answers one request before any check: an exception is raised, a
     response is returned, and "lost-reply" creates the message and then raises `ReadTimeout`, as
     if the reply were lost. `messages` holds every message made; `requests` every request.
+
+    Interactions: `press(custom_id)` and `submit(custom_id, value)` return the Gateway's
+    INTERACTION_CREATE data for a button press (type 3) or a form submission (type 5, a Label
+    holding a Text Input), from `owner_id` in `channel_id` unless told otherwise.
+    `POST /api/v10/interactions/<id>/<token>/callback` needs the User-Agent but no Authorization.
+    It answers 204,
+    or 404 (code 10062) for an unknown interaction and 400 (code 40060) for a second response.
+    It also answers 400 (code 50035) for a type the interaction can't take: 4, 6, 7 or 9 for a
+    press, and 4, 6 or 7 for a submission. Messages (4, 7) are checked like a new message, with
+    only flag 64 allowed. A form (9) needs a `custom_id` of 1 to 100, a title of 1 to 45, and 1 to
+    5 Labels (type 18, label 1 to 45), each holding a Text Input (type 4) with a `custom_id` of 1
+    to 100, style 1 or 2, lengths within 0 to 4000 and a value of at most 4000. `callbacks` holds
+    every accepted (interaction id, body).
     """
 
     API = "https://discord.com/api/v10"
@@ -405,6 +418,110 @@ class FakeDiscord:
         self.messages: list[dict] = []
         self.requests: list[httpx.Request] = []
         self.failures: list[object] = []
+        self.owner_id = "444444444444444444"
+        self.callbacks: list[tuple[str, dict]] = []
+        self._interactions: dict[str, dict] = {}
+
+    def press(
+        self,
+        custom_id: str,
+        *,
+        user_id: str | None = None,
+        channel_id: str | None = None,
+        message_id: str = "1300000000000000001",
+    ) -> dict:
+        data = {"custom_id": custom_id, "component_type": 2}
+        return self._interaction(3, data, user_id, channel_id, message_id)
+
+    def submit(self, custom_id: str, value: str, *, user_id: str | None = None) -> dict:
+        text_input = {"type": 4, "id": 2, "custom_id": "title", "value": value}
+        data = {
+            "custom_id": custom_id,
+            "components": [{"type": 18, "id": 1, "component": text_input}],
+        }
+        return self._interaction(5, data, user_id, None, "1300000000000000001")
+
+    def _interaction(
+        self, kind: int, data: dict, user_id: str | None, channel_id: str | None, message_id: str
+    ) -> dict:
+        number = len(self._interactions) + 1
+        interaction_id = str(1400000000000000000 + number)
+        channel = channel_id or self.channel_id
+        event = {
+            "id": interaction_id,
+            "application_id": "222222222222222222",
+            "type": kind,
+            "token": f"interaction-token-{number}",
+            "version": 1,
+            "guild_id": "333333333333333333",
+            "channel_id": channel,
+            "member": {
+                "user": {"id": user_id or self.owner_id, "username": "someone"},
+                "roles": [],
+            },
+            "data": data,
+            "message": {"id": message_id, "channel_id": channel},
+        }
+        self._interactions[interaction_id] = {"event": event, "answered": False}
+        return event
+
+    def _callback(self, request: httpx.Request) -> httpx.Response:
+        if not request.headers.get("user-agent", "").startswith("DiscordBot ("):
+            return httpx.Response(403, text="error code: 1010")
+        parts = request.url.path.split("/")
+        known = self._interactions.get(parts[4]) if len(parts) == 7 else None
+        if request.method != "POST" or known is None or known["event"]["token"] != parts[5]:
+            return httpx.Response(404, json={"message": "Unknown interaction", "code": 10062})
+        if known["answered"]:
+            return httpx.Response(
+                400, json={"message": "Interaction has already been acknowledged.", "code": 40060}
+            )
+        body = json.loads(request.content)
+        allowed = (4, 6, 7, 9) if known["event"]["type"] == 3 else (4, 6, 7)
+        kind = body.get("type")
+        data = body.get("data", {})
+        if kind not in allowed:
+            problem = "response type"
+        elif kind in (4, 7):
+            problem = self._problem(data) or (
+                "flags" if data.get("flags", 0) not in (0, 64) else ""
+            )
+        elif kind == 9:
+            problem = self._form_problem(data)
+        else:
+            problem = "data" if data else ""
+        if problem:
+            return httpx.Response(
+                400, json={"message": "Invalid Form Body", "code": 50035, "errors": problem}
+            )
+        known["answered"] = True
+        self.callbacks.append((parts[4], body))
+        return httpx.Response(204)
+
+    @staticmethod
+    def _form_problem(data: dict) -> str:
+        if (
+            not 0 < len(data.get("custom_id", "")) <= 100
+            or not 0 < len(data.get("title", "")) <= 45
+        ):
+            return "form"
+        labels = data.get("components", [])
+        if not 0 < len(labels) <= 5:
+            return "form components"
+        for label in labels:
+            field = label.get("component", {})
+            if label.get("type") != 18 or not 0 < len(label.get("label", "")) <= 45:
+                return "label"
+            if field.get("type") != 4 or field.get("style") not in (1, 2):
+                return "text input"
+            if not 0 < len(field.get("custom_id", "")) <= 100:
+                return "text input custom_id"
+            low, high = field.get("min_length", 0), field.get("max_length", 4000)
+            if not (0 <= low <= 4000 and 1 <= high <= 4000 and low <= high):
+                return "text input lengths"
+            if len(field.get("value", "")) > 4000:
+                return "text input value"
+        return ""
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -416,6 +533,8 @@ class FakeDiscord:
             if isinstance(failure, httpx.Response):
                 return failure
             lost = failure == "lost-reply"
+        if request.url.path.startswith("/api/v10/interactions/"):
+            return self._callback(request)
         if request.headers.get("authorization") != f"Bot {self.token}":
             return httpx.Response(401, json={"message": "401: Unauthorized", "code": 0})
         if not request.headers.get("user-agent", "").startswith("DiscordBot ("):

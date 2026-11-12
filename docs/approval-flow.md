@@ -31,6 +31,8 @@ The Discord message is a card showing the sender, subject, a short local summary
 | Mute sender | Item is closed and future mail from the sender is dropped by the rules |
 | Trust sender | Adds the sender to your trusted list (see below); does not answer the checkpoint |
 
+Once you answer, the card updates in place to show your answer, and only Show full text and Open email remain. Only your first answer counts.
+
 ## Trusted senders
 
 The trusted list starts empty and grows as you use the service.

@@ -79,6 +79,15 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK ((discord_message_id IS NULL) = (posted_at IS NULL))
     ) STRICT;
     """,
+    """
+    CREATE TABLE answers (
+        item_id TEXT PRIMARY KEY,
+        answer TEXT NOT NULL CHECK (answer IN ('yes', 'edit', 'notask', 'mute')),
+        title TEXT NOT NULL,
+        answered_at TEXT NOT NULL,
+        CHECK ((answer IN ('yes', 'edit')) = (title != ''))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -1,6 +1,6 @@
 # Open Questions
 
-All open questions are resolved. Add new ones here as they come up.
+- [ ] **Sender score.** Every "Not a task" answer is recorded (Phase 1i), but what a lower score changes is not decided yet. Decide once the service has been used for a while.
 
 ## Resolved
 

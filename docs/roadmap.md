@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1g done. Phase 1h specified (`docs/phases/phase-01h-discord-posting.md`); result pending.
+Status: Phases 0 to 1h done. Phase 1i specified (`docs/phases/phase-01i-discord-answers.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -18,9 +18,9 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1e** sender authentication and the rules. Done.
    - **1f** the extractor: prompt, schema, validation, a fake model. Done.
    - **1g** storing the triage result (cleared after 24 hours), the notify decision and ranking. Done.
-   - **1h** posting checkpoint 1 messages to Discord, retry-safe. Specified.
-   - **1i** receiving button presses: the owner check, Show full text and the answers.
-   - **1j** the `/trust`, `/untrust` and `/trusted` commands.
+   - **1h** posting checkpoint 1 messages to Discord, retry-safe. Done.
+   - **1i** handling button presses: the owner check, Show full text, Trust, the answers and the Edit title form. Specified.
+   - **1j** the Gateway connection that delivers presses, and the `/trust`, `/untrust` and `/trusted` commands.
    - **1k** the poll loop that joins them.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.

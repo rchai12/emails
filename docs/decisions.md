@@ -41,6 +41,8 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Agent access | Only a dedicated email subagent uses the MCP tools | Keeps email content out of other agents' context | Master agent calling the tools directly |
 | Discord transport | Plain REST calls with httpx for every send; a Gateway listener only to receive presses | Same client and fakes as every other outside call; no library in between | discord.py for everything |
 | Discord message | An embed card, with the email's text inside code blocks and backticks replaced | Nothing in an email can format, link or mention; the card is easy to scan | Plain text lines |
+| Answered card | Updated in place: your answer shown, answer buttons removed | Can't be answered twice; the channel shows what's done | A private confirmation under an unchanged card |
+| Presses from others | Acknowledged with no change | Nothing happens for anyone but you, and they see nothing | A refusal message |
 | Discord content | Short local summary, a link (exact email for Gmail and Outlook, inbox for Yahoo) and a Show full text button | Discord stores what is posted, so the body is never posted in the channel | Full body in the message |
 | Full text on request | Private reply only you can see, sent when you tap Show full text | Lets you read the whole email without leaving Discord or keeping it in channel history | A local web page (needs a private connection from your phone); posting it in the channel |
 | Handoff | The email service runs every checkpoint and sends the tasks app API only fully approved tasks | Simpler, and fits combined approval; the tasks app never asks you twice | The tasks app running the deadline checkpoint; direct writes to tasks or calendar |

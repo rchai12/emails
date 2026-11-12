@@ -14,6 +14,7 @@ TIME_ZONE_MESSAGE = "MAILROOM_TIME_ZONE must be an IANA time zone name"
 DISCORD_CHANNEL_MESSAGE = (
     "MAILROOM_DISCORD_CHANNEL_ID must be a Discord channel id (17 to 20 digits)"
 )
+DISCORD_OWNER_MESSAGE = "MAILROOM_DISCORD_OWNER_ID must be a Discord user id (17 to 20 digits)"
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 _CHANNEL_ID = re.compile(r"[0-9]{17,20}")
@@ -22,6 +23,7 @@ _FIELD_MESSAGES = {
     "extractor_url": EXTRACTOR_URL_MESSAGE,
     "time_zone": TIME_ZONE_MESSAGE,
     "discord_channel_id": DISCORD_CHANNEL_MESSAGE,
+    "discord_owner_id": DISCORD_OWNER_MESSAGE,
 }
 
 
@@ -55,6 +57,7 @@ class Settings(BaseSettings):
     extractor_model: str = ""
     time_zone: str = ""
     discord_channel_id: str = ""
+    discord_owner_id: str = ""
 
     @field_validator("data_dir", mode="before")
     @classmethod
@@ -88,6 +91,13 @@ class Settings(BaseSettings):
         if value == "" or _CHANNEL_ID.fullmatch(value):
             return value
         raise ValueError(DISCORD_CHANNEL_MESSAGE)
+
+    @field_validator("discord_owner_id")
+    @classmethod
+    def _check_discord_owner_id(cls, value: str) -> str:
+        if value == "" or _CHANNEL_ID.fullmatch(value):
+            return value
+        raise ValueError(DISCORD_OWNER_MESSAGE)
 
 
 def get_settings() -> Settings:

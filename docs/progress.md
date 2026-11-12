@@ -82,3 +82,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1i: Discord answers (2026-11-12)
+- Tests: 441 -> 490 (given 40)
+- New public names: `store`: `Answer`, `post_by_item`, `record_answer`, `answer`; `config`: `DISCORD_OWNER_MESSAGE`, `discord_owner_id`; `checkpoint`: `answered_message`; `interactions`: `handle_interaction`
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

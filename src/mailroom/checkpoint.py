@@ -3,10 +3,11 @@ from mailroom.record import Record
 from mailroom.store import Verdict
 
 
-def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
-    def block(text: str) -> str:
-        return "```\n" + text.replace(L.BACKTICK, L.BACKTICK_STAND_IN) + "\n```"
+def _block(text: str) -> str:
+    return "```\n" + text.replace(L.BACKTICK, L.BACKTICK_STAND_IN) + "\n```"
 
+
+def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
     address = record.sender if record.sender else L.NO_ADDRESS
     sender = f"{record.sender_name} <{address}>" if record.sender_name else address
     subject = record.subject if record.subject else L.NO_SUBJECT
@@ -18,20 +19,20 @@ def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[s
     else:
         color = L.COLOR_NORMAL
     if extraction is not None:
-        summary = block(extraction.summary)
+        summary = _block(extraction.summary)
     elif verdict.outcome == "rejected":
         summary = L.UNREAD_TEXT.replace("{reason}", verdict.reason)
     else:
         summary = L.EXPIRED_TEXT
     fields: list[dict[str, str]] = [
-        {"name": L.FROM_NAME, "value": block(sender)},
-        {"name": L.SUBJECT_NAME, "value": block(subject)},
+        {"name": L.FROM_NAME, "value": _block(sender)},
+        {"name": L.SUBJECT_NAME, "value": _block(subject)},
         {"name": L.SUMMARY_NAME, "value": summary},
     ]
     if extraction is not None and extraction.title:
-        fields.append({"name": L.TASK_NAME, "value": block(extraction.title)})
+        fields.append({"name": L.TASK_NAME, "value": _block(extraction.title)})
     if extraction is not None and extraction.suspicious:
-        fields.append({"name": L.WARNING_NAME, "value": block(extraction.suspicion_reason)})
+        fields.append({"name": L.WARNING_NAME, "value": _block(extraction.suspicion_reason)})
     if verdict.trusted:
         standing = L.TRUSTED_TEXT
     elif verdict.verified:
@@ -69,4 +70,24 @@ def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[s
         "allowed_mentions": {"parse": []},
         "nonce": item_id[: L.NONCE_LENGTH],
         "enforce_nonce": True,
+    }
+
+
+def answered_message(
+    record: Record, verdict: Verdict, item_id: str, answer: str, title: str
+) -> dict[str, object]:
+    card = checkpoint_message(record, verdict, item_id)
+    embed = card["embeds"][0]
+    shown = L.ANSWER_TEXT[answer]
+    if answer in ("yes", "edit"):
+        shown = shown + "\n" + _block(title)
+    embed["fields"].append({"name": L.ANSWER_NAME, "value": shown})
+    full = card["components"][0]["components"][0]
+    row = [full]
+    if len(record.link) <= L.LINK_LIMIT:
+        row.append({"type": 2, "style": L.LINK_STYLE, "label": L.OPEN_LABEL, "url": record.link})
+    return {
+        "embeds": [embed],
+        "components": [{"type": 1, "components": row}],
+        "allowed_mentions": {"parse": []},
     }

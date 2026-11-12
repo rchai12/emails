@@ -55,3 +55,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1f: Extractor (2026-11-12)
+- Tests: 306 -> 352 (given 29)
+- New public names: `config`: `EXTRACTOR_URL_MESSAGE`, `TIME_ZONE_MESSAGE`, `extractor_url`, `extractor_model`, `time_zone`; `extractor`: `TIMEOUT_SECONDS`, `ModelUnavailable`, `Deadline`, `Extraction`, `Rejected`, `user_message`, `extract`, `open_model_http`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

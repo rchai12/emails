@@ -6,15 +6,16 @@ Fixed rules drop only mail that is clearly not for you, a local model extracts a
 
 1. **Sender check.** Code reads the provider's authentication results (SPF, DKIM and DMARC). A sender counts as [trusted](approval-flow.md#trusted-senders) only if the address is on your trusted list and the email passes DMARC, or both SPF and DKIM for the sender's domain. Otherwise it's treated as untrusted, so a forged "From" address gains nothing. Only the provider's own header counts (the first one, from `mx.google.com` for Gmail), because anyone can put such a header in the mail they send.
 2. **Rules.** Only your muted senders are dropped with no model call; there is no built-in newsletter list, so Mute sender is how a newsletter stops. Mail from a trusted sender is never dropped. Bulk-mail signs such as a `List-Unsubscribe` header lower the email's score instead of dropping it, because banks, bills, schools and work systems often send with that header.
-3. **Extractor.** A local model of 27B parameters or more (such as Qwen 3.6 or 3.8) with no tools reads the message and returns strict JSON:
+3. **Extractor.** A local model of 27B parameters or more (such as Qwen 3.6 or 3.8), run by Ollama on the Mac with no tools, reads the message and returns strict JSON (the prompt, schema and sampling are fixed in `mailroom.extractor_prompt`):
+   - a short summary for the Discord message
    - urgent
    - actionable
    - task title (plain text, at most 100 characters)
-   - explicit deadline
+   - the deadline as a date (and time, if stated) that the model works out from the sent date and your time zone, and whether the email states it explicitly
    - a short quote from the email as evidence for the deadline
    - suspected spam or phishing: yes or no, with a one-line reason
    - confidence
-4. **Validation.** Code checks the JSON against the schema and rejects anything malformed or too long.
+4. **Validation.** Code checks the JSON against the schema and rejects anything malformed or too long, naming the field. A rejected email is still sent to you, marked as one the model couldn't read, so no task is missed.
 5. **Decision.** Thresholds in code, not the model, decide whether to send a Discord notification, and whether the email is clearly dated enough for [combined approval](approval-flow.md#combined-approval-for-clearly-dated-emails). Thresholds start low, so borderline emails reach you rather than being dropped. There is no notification cap; in busy hours notifications are [batched into ranked digests](approval-flow.md#busy-hours-batching) instead.
 
 ## Spam and phishing suggestions

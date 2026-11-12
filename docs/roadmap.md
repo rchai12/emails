@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1d done. Phase 1e specified (`docs/phases/phase-01e-sender-checks-and-rules.md`); result pending.
+Status: Phases 0 to 1e done. Phase 1f specified (`docs/phases/phase-01f-extractor.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -15,10 +15,11 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1b** the Gmail client: token refresh and the four read calls, against a fake Gmail. Done.
    - **1c** Gmail sync: the bookmark, inbox only, dedup, first run (3 days), catch-up after an outage. Done.
    - **1d** the Gmail login command: one-time browser consent that stores the refresh token. Done.
-   - **1e** sender authentication and the rules. Specified.
-   - **1f** the extractor: prompt, schema, validation, a fake model.
-   - **1g** the notify decision and Discord checkpoint 1.
-   - **1h** the poll loop that joins them.
+   - **1e** sender authentication and the rules. Done.
+   - **1f** the extractor: prompt, schema, validation, a fake model. Specified.
+   - **1g** storing the triage result (cleared after 24 hours), the notify decision and ranking.
+   - **1h** Discord checkpoint 1.
+   - **1i** the poll loop that joins them.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
 3. **Send approved tasks to the real tasks app.**

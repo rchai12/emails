@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import json
 
 import httpx
 from keyring.backend import KeyringBackend
@@ -330,5 +331,51 @@ class FakeGmail:
                 "internalDate": message["internalDate"],
                 "sizeEstimate": len(message["raw"]),
                 "raw": raw,
+            },
+        )
+
+
+class FakeOllama:
+    """Ollama's `POST /api/chat`, non-streaming, for httpx.MockTransport.
+
+    Each call answers with the next entry of `replies`: a dict (sent as the JSON text of
+    `message.content`), a string (sent as the content as it is), an `httpx.Response`, or an
+    exception to raise. `done_reason` is "stop" unless the entry is a `(content, done_reason)`
+    pair. An unknown model gets 404, as Ollama answers. Every request is kept in `requests`.
+    """
+
+    URL = "http://127.0.0.1:11434/api/chat"
+
+    def __init__(self) -> None:
+        self.model = "qwen-test:27b"
+        self.replies: list[object] = []
+        self.requests: list[httpx.Request] = []
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if request.method != "POST" or request.url.path != "/api/chat":
+            return httpx.Response(404, text="404 page not found")
+        body = json.loads(request.content)
+        if body.get("model") != self.model:
+            return httpx.Response(404, json={"error": f"model '{body.get('model')}' not found"})
+        if body.get("stream") is not False or "format" not in body:
+            return httpx.Response(400, json={"error": "mailroom asks for one JSON reply"})
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        if isinstance(reply, httpx.Response):
+            return reply
+        content, done_reason = reply if isinstance(reply, tuple) else (reply, "stop")
+        text = content if isinstance(content, str) else json.dumps(content)
+        return httpx.Response(
+            200,
+            json={
+                "model": self.model,
+                "created_at": "2026-11-12T09:00:00.000000Z",
+                "message": {"role": "assistant", "content": text},
+                "done": True,
+                "done_reason": done_reason,
+                "total_duration": 4_000_000_000,
+                "eval_count": 120,
             },
         )

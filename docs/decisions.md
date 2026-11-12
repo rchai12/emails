@@ -29,6 +29,9 @@ An email becomes a task only after your approval on Discord, and the service hol
 | HTML email | Standard library `html.parser`, link addresses kept as plain text | No dependency parsing untrusted input; the model and you see where links point | An HTML-to-text package |
 | Dropped mail | Only senders you muted, matched by exact address | Nothing is dropped that you never chose | A built-in newsletter list; muting whole domains |
 | Which authentication header | The first one, and only from the provider's own server | Senders can add their own fake headers lower down | Reading every header |
+| Model server | Ollama on the Mac, its own API, `format` set to the schema | Common Mac setup; the reply is held to the schema | An OpenAI-compatible server |
+| Relative deadlines | The model resolves them from the sent date and your time zone; code checks every value | Handles any wording; code still decides what counts | A date parser in code |
+| Unreadable model reply | Rejected by field name and still sent to you, marked as unread by the model | No task is missed | Holding it silently; retrying |
 | Bulk-mail headers | Lower the score, never drop | Bills and work mail often carry `List-Unsubscribe` | Dropping on the header alone |
 | Triage tuning | Miss as few tasks as possible | A "Not a task" tap is cheap; a missed task is not | Tuning for fewer notifications |
 | Spam and phishing | The model suggests with a reason; you decide | Catches crafted "urgent" mail without ever hiding real mail | Auto-filing as spam |

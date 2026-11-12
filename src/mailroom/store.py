@@ -1,8 +1,10 @@
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal, cast
 
 from mailroom import clock
 from mailroom.config import Settings, prepare_data_dir
@@ -12,6 +14,11 @@ from mailroom.schema import MIGRATIONS
 DB_FILENAME = "mailroom.sqlite3"
 SCHEMA_MESSAGE = "unsupported schema version"
 TEXT_RETENTION = timedelta(hours=24)
+SENDER_MESSAGE = "invalid sender address"
+STATUS_MESSAGE = "invalid sender status"
+
+_SENDER = re.compile(r"[^@\s]+@[^@\s]+")
+_STATUSES = ("trusted", "muted")
 
 _INSERT = """
 INSERT INTO messages (
@@ -47,6 +54,19 @@ def _stamp(moment: datetime) -> str:
 
 def _read_time(value: str) -> datetime:
     return datetime.fromisoformat(value)
+
+
+def _sender_address(address: str) -> str:
+    lowered = address.lower()
+    if _SENDER.fullmatch(lowered) is None or len(lowered) > 254:
+        raise ValueError(SENDER_MESSAGE)
+    return lowered
+
+
+def _sender_status(status: str) -> Literal["trusted", "muted"]:
+    if status not in _STATUSES:
+        raise ValueError(STATUS_MESSAGE)
+    return cast(Literal["trusted", "muted"], status)
 
 
 @dataclass(frozen=True)
@@ -173,6 +193,38 @@ class Store:
             (provider, account, state.bookmark, _stamp(state.synced_at)),
         )
         self._connection.commit()
+
+    def sender_status(self, address: str) -> Literal["trusted", "muted"] | None:
+        row = self._connection.execute(
+            "SELECT status FROM senders WHERE address = ?",
+            (_sender_address(address),),
+        ).fetchone()
+        if row is None:
+            return None
+        return _sender_status(row[0])
+
+    def set_sender_status(self, address: str, status: Literal["trusted", "muted"] | None) -> None:
+        lowered = _sender_address(address)
+        if status is None:
+            self._connection.execute("DELETE FROM senders WHERE address = ?", (lowered,))
+        else:
+            stored = _sender_status(status)
+            self._connection.execute(
+                """
+                INSERT INTO senders (address, status) VALUES (?, ?)
+                ON CONFLICT (address) DO UPDATE SET status = excluded.status
+                """,
+                (lowered, stored),
+            )
+        self._connection.commit()
+
+    def senders(self, status: Literal["trusted", "muted"]) -> tuple[str, ...]:
+        stored = _sender_status(status)
+        rows = self._connection.execute(
+            "SELECT address FROM senders WHERE status = ? ORDER BY address",
+            (stored,),
+        ).fetchall()
+        return tuple(row[0] for row in rows)
 
     def clear_expired_text(self) -> int:
         now = clock.now()

@@ -46,3 +46,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1e: Sender checks and rules (2026-11-12)
+- Tests: 271 -> 306 (given 32)
+- New public names: `store`: `SENDER_MESSAGE`, `STATUS_MESSAGE`, `sender_status`, `set_sender_status`, `senders`; `sender_auth`: `AUTHSERV_IDS`, `AuthResult`, `parse_results`, `verified`; `rules`: `Screening`, `screen`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

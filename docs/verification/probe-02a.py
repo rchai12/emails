@@ -1,7 +1,9 @@
 """Probe for phase 2a. Run from the repository root: .venv/bin/python docs/verification/probe-02a.py
 
-Two stores on one file take random turns calling store methods. Some calls get a refused input (a
-verdict outcome the schema forbids, a sender status that does not exist); some run with
+Two stores on one file take random turns calling store methods. Each trial opens with two
+notified emails and a `queue_notified` whose second id fails, a write that stops halfway. Some
+calls get a refused input (a verdict outcome the schema forbids, a sender status that does not
+exist); some run with
 `ids.new_id` or `clock.now` set to fail after a random number of calls. After every call:
   - another connection can take the write lock at once (nothing is left uncommitted)
   - a call that raised left every table exactly as it was (read through a separate connection)
@@ -166,6 +168,10 @@ def failed_calls_change_nothing() -> object:
         path = TMP / f"trial{trial}" / DB_FILENAME
         MOMENT[0] = START
         with open_store(get_settings()) as first, open_store(get_settings()) as second:
+            clock.now = lambda: MOMENT[0]
+            for number in (8, 9):
+                first.add(replace(RECORD, message_id=f"personal/m{number}"))
+                first.save_triage("gmail", f"personal/m{number}", NOTIFY)
             for turn in range(80):
                 MOMENT[0] += timedelta(hours=rng.choice((0, 1, 7)))
                 store = rng.choice((first, second))
@@ -174,7 +180,12 @@ def failed_calls_change_nothing() -> object:
                 ids.new_id = REAL_IDS
                 clock.now = lambda: MOMENT[0]
                 handing = FailingAfter(rng.randrange(3), REAL_IDS)
-                if inject < 0.25:
+                if turn == 0:
+                    # Two notified rows wait, and the second id fails: a write that stops halfway.
+                    name, call, refused, must = "queue_notified", store.queue_notified, None, False
+                    handing = FailingAfter(1, REAL_IDS)
+                    ids.new_id = handing
+                elif inject < 0.25:
                     ids.new_id = handing
                 elif inject < 0.35:
                     clock.now = FailingAfter(rng.randrange(2), lambda: MOMENT[0])

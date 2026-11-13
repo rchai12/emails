@@ -70,9 +70,13 @@ An email counts as clearly dated only when code confirms all of these; the model
 
 - the email is not flagged as suspected spam or phishing
 - the extractor returned an explicit deadline, not one inferred from vague wording
-- the evidence quote appears word for word in the email
-- the deadline resolves to a single date (and time, if given)
-- confidence is at or above the threshold set in code
+- the evidence quote appears word for word in the subject or body (case included; any run of spaces and line breaks counts as one space)
+- the deadline resolves to a single date (and time, if given): code reads the quote itself, with a small fixed grammar of month-name dates, ISO dates, weekdays, `today` and `tomorrow`, and its reading must equal the model's date and time; numeric dates such as `11/20`, and anything ambiguous, fall back to two checkpoints
+- confidence is `high`
+- the deadline is on or after the day the email was sent, within 366 days of it, and not already past (days in your time zone)
+- the email is actionable with a proposed title
+
+The rule is `mailroom.deadlines.clearly_dated` (Phase 2b).
 
 | Button | Result |
 | --- | --- |

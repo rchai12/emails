@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1o done; 2a is specified.
+Status: Phases 0 to 2a done; 2b is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -29,7 +29,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
    Sub-phases (later ones are planned when each is specified):
-   - **2a** `store.py` split into a package with one module per area, `Store`'s API unchanged, and every write committed or rolled back as a whole.
+   - **2a** `store.py` split into a package with one module per area, `Store`'s API unchanged, and every write committed or rolled back as a whole. Done.
+   - **2b** the clearly-dated rule in code: a deadline reader for the evidence quote and every condition for combined approval, as pure functions.
 3. **Send approved tasks to the real tasks app.**
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
 4. **live.com adapter** using the same pipeline.

@@ -19,7 +19,7 @@ def test_a_version_1_database_gains_the_sync_table(tmp_path: Path) -> None:
         store.save_sync_state("gmail", "personal", STATE)
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone() == (7,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (8,)
         assert connection.execute("SELECT * FROM sync_state").fetchall() == [
             ("gmail", "personal", "1007", "2026-11-11T09:00:00.000250+00:00")
         ]

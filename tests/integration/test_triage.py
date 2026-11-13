@@ -8,7 +8,7 @@ import pytest
 from mailroom.config import Settings, get_settings
 from mailroom.extractor import Deadline, Extraction, ModelUnavailable
 from mailroom.record import Record
-from mailroom.store import Store, StoredTriage, Verdict, open_store
+from mailroom.store import Due, Store, StoredTriage, Verdict, open_store
 from mailroom.triage import triage_message
 from tests.fakes import FakeOllama
 from tests.support import fixed_times
@@ -75,7 +75,12 @@ def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
 
 @pytest.fixture
 def store(monkeypatch: pytest.MonkeyPatch) -> Iterator[Store]:
-    fixed_times(monkeypatch, "2026-11-10T08:01:00+00:00", "2026-11-10T08:05:00+00:00")
+    fixed_times(
+        monkeypatch,
+        "2026-11-10T08:01:00+00:00",
+        "2026-11-10T08:04:00+00:00",
+        "2026-11-10T08:05:00+00:00",
+    )
     with open_store(get_settings()) as opened:
         yield opened
 
@@ -107,6 +112,8 @@ def test_a_new_message_is_screened_extracted_decided_and_stored(
         bulk=False,
         notify=True,
         extraction=EXTRACTION,
+        dated=True,
+        due=Due(date=date(2026, 11, 20), time=time(17, 0)),
     )
     assert stored(store, verdict)
     assert len(fake.requests) == 1

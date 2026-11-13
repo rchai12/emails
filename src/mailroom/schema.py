@@ -105,6 +105,25 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK ((discord_message_id IS NULL) = (posted_at IS NULL))
     ) STRICT;
     """,
+    # 8: the proposed deadline (kept after the text is cleared) and the clearly-dated decision.
+    # A column's CHECK may name only columns that already exist, so the order matters.
+    """
+    ALTER TABLE triage ADD COLUMN deadline_date TEXT
+        CHECK (
+            deadline_date IS NULL
+            OR (outcome = 'extracted' AND date(deadline_date) IS deadline_date)
+        );
+    ALTER TABLE triage ADD COLUMN deadline_time TEXT
+        CHECK (
+            deadline_time IS NULL
+            OR (deadline_date IS NOT NULL AND strftime('%H:%M', deadline_time) IS deadline_time)
+        );
+    ALTER TABLE triage ADD COLUMN dated INTEGER NOT NULL DEFAULT 0
+        CHECK (
+            dated IN (0, 1)
+            AND (dated = 0 OR (outcome = 'extracted' AND deadline_date IS NOT NULL))
+        );
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

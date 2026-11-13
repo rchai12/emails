@@ -61,7 +61,7 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 | Table | Holds | Kept |
 | --- | --- | --- |
 | messages | Normalized records, including body text | Body text and authentication results cleared 24 hours after fetch; the row stays as a dedup key |
-| triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, and the extractor output (summary, title, deadline, quote, spam reason) | Extractor output cleared with the email's text, 24 hours after fetch; the verdict stays |
+| triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, the extractor output (summary, title, deadline, quote, spam reason), and (from Phase 2c) the proposed deadline's date and time and whether the email is clearly dated | Extractor output cleared with the email's text, 24 hours after fetch; the verdict, the proposed date and time, and the clearly-dated flag stay |
 | threads (planned, stage 3) | Thread ID to task ID mapping | Long term; no email text |
 | posts | Each notified email's item id, when it was queued, and its Discord message ID once posted | Long term; no email text |
 | answers | Your first answer to each posted email (yes, edit, not a task, mute), with the approved title for yes and edit | Long term; the title is kept like a pending item's task title |

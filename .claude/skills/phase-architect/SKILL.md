@@ -94,7 +94,7 @@ Phase 1a cost the most of any phase so far: it was twice the size limit, its pro
 
 ### 6. Spot checks (on paper)
 
-20. Each row names one deciding test. Trace its exact input through the broken code line by line, and write down the correct and broken outputs; they must differ. A layered defence loses every layer, or the test reaches the inner one. The "Broken" cell names a short value from the data (`'gmail'`, `needs_approval`), never the test runner's wording, which changes with the output's length. Name the test by its full id. The verifier confirms the rows against the coder's build.
+20. Each row names one deciding test. Trace its exact input through the broken code line by line, and write down the correct and broken outputs; they must differ. A layered defence loses every layer, or the test reaches the inner one: before writing a row, list every requirement that also stops the broken output (a flag, a second check) and remove those too (2b's `\d` row kept `re.ASCII`). The "Broken" cell names a short value from the data (`'gmail'`, `needs_approval`), never the test runner's wording, which changes with the output's length. Name the test by its full id. The verifier confirms the rows against the coder's build.
 
 ### 7. Write the spec and the guide
 

@@ -127,3 +127,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1n: Account ids and backups (2026-11-13)
+- Tests: 637 -> 674 (given 37)
+- New public names: `record`: `ACCOUNT_PATTERN`, `stored_id`, `account_of`; `config`: `BACKUP_ATTRIBUTE`, `BACKUP_VALUE`, `BACKUP_MESSAGE`, `exclude_from_backup`
+- Changed files: 7
+- Deviations:
+  - None
+- Follow-ups:
+  - None

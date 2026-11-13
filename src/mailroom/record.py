@@ -5,6 +5,7 @@ adapter takes from its provider form the `Envelope`; `mailroom.mime.parse_messag
 from the raw message.
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -14,6 +15,22 @@ PROVIDERS: tuple[str, ...] = ("gmail", "outlook", "yahoo")
 ID_LIMIT = 1000
 LINK_LIMIT = 2000
 FIELD_MESSAGE = "invalid record field"
+ACCOUNT_PATTERN = "[a-z][a-z0-9-]{0,31}"
+
+_ACCOUNT = re.compile(ACCOUNT_PATTERN)
+
+
+def stored_id(account: str, provider_id: str) -> str:
+    if _ACCOUNT.fullmatch(account) is None:
+        raise ValueError(f"{FIELD_MESSAGE}: account")
+    return f"{account}/{provider_id}"
+
+
+def account_of(message_id: str) -> str | None:
+    account, slash, _rest = message_id.partition("/")
+    if slash and _ACCOUNT.fullmatch(account):
+        return account
+    return None
 
 
 def _is_id(value: object) -> bool:

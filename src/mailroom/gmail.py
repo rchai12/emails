@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 
 from mailroom import clock, keychain
+from mailroom.record import ACCOUNT_PATTERN
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -17,7 +18,7 @@ TOKEN_MARGIN = timedelta(seconds=60)
 ACCOUNT_MESSAGE = "invalid account name"
 MESSAGE_ID_MESSAGE = "invalid message id"
 
-_ACCOUNT = re.compile(r"[a-z][a-z0-9-]{0,31}")
+_ACCOUNT = re.compile(ACCOUNT_PATTERN)
 _MESSAGE_ID = re.compile(r"[A-Za-z0-9_-]{1,256}")
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 

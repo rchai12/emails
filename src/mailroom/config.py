@@ -1,3 +1,5 @@
+import ctypes
+import os
 import re
 from pathlib import Path
 from typing import Annotated, cast
@@ -6,6 +8,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from mailroom.record import ACCOUNT_PATTERN
 
 DATA_DIR_MESSAGE = "MAILROOM_DATA_DIR must be an absolute path"
 EXTRACTOR_URL_MESSAGE = (
@@ -19,10 +23,27 @@ DISCORD_OWNER_MESSAGE = "MAILROOM_DISCORD_OWNER_ID must be a Discord user id (17
 DISCORD_GUILD_MESSAGE = "MAILROOM_DISCORD_GUILD_ID must be a Discord server id (17 to 20 digits)"
 GMAIL_ACCOUNTS_MESSAGE = "MAILROOM_GMAIL_ACCOUNTS must be account names separated by commas"
 POLL_MESSAGE = "MAILROOM_POLL_SECONDS must be a whole number from 30 to 600"
+BACKUP_ATTRIBUTE = "com.apple.metadata:com_apple_backup_excludeItem"
+BACKUP_VALUE = (
+    b"bplist00_\x10\x11com.apple.backupd\x08\x00\x00\x00\x00\x00\x00\x01\x01"
+    b"\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00"
+    b"\x00\x00\x00\x00\x00\x00\x00\x1c"
+)
+BACKUP_MESSAGE = "could not exclude the data folder from Time Machine"
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 _CHANNEL_ID = re.compile(r"[0-9]{17,20}")
-_ACCOUNT = re.compile(r"[a-z][a-z0-9-]{0,31}")
+_ACCOUNT = re.compile(ACCOUNT_PATTERN)
+_SETXATTR = ctypes.CDLL(None, use_errno=True).setxattr
+_SETXATTR.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_char_p,
+    ctypes.c_void_p,
+    ctypes.c_size_t,
+    ctypes.c_uint32,
+    ctypes.c_int,
+]
+_SETXATTR.restype = ctypes.c_int
 _FIELD_MESSAGES = {
     "data_dir": DATA_DIR_MESSAGE,
     "extractor_url": EXTRACTOR_URL_MESSAGE,
@@ -146,8 +167,23 @@ def get_settings() -> Settings:
         raise ConfigError(_FIELD_MESSAGES[str(field)]) from None
 
 
+def exclude_from_backup(folder: Path) -> None:
+    value = ctypes.create_string_buffer(BACKUP_VALUE)
+    result = _SETXATTR(
+        os.fsencode(folder),
+        BACKUP_ATTRIBUTE.encode(),
+        value,
+        len(BACKUP_VALUE),
+        0,
+        0,
+    )
+    if result != 0:
+        raise ConfigError(BACKUP_MESSAGE) from None
+
+
 def prepare_data_dir(settings: Settings) -> Path:
     folder = settings.data_dir
     folder.mkdir(parents=True, exist_ok=True)
     folder.chmod(0o700)
+    exclude_from_backup(folder)
     return folder

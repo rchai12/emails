@@ -85,6 +85,6 @@ def run() -> None:
     signal.signal(signal.SIGINT, _stop)
     try:
         service.run_service(settings, say=lambda line: typer.echo(line, err=True), stop=stop)
-    except service.ServiceError as error:
+    except (service.ServiceError, ConfigError) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from None

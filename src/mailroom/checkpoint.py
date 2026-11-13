@@ -1,5 +1,5 @@
 from mailroom import discord_layout as L
-from mailroom.record import Record
+from mailroom.record import Record, account_of
 from mailroom.store import Verdict
 
 
@@ -39,7 +39,11 @@ def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[s
         standing = L.VERIFIED_TEXT
     else:
         standing = L.UNVERIFIED_TEXT
-    footer = [L.PROVIDER_NAMES[record.provider], standing]
+    provider = L.PROVIDER_NAMES[record.provider]
+    account = account_of(record.message_id)
+    if account is not None:
+        provider = f"{provider} {account}"
+    footer = [provider, standing]
     if verdict.bulk:
         footer.append(L.BULK_TEXT)
     answers = [

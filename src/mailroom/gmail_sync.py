@@ -6,7 +6,7 @@ from urllib.parse import quote
 from mailroom import clock
 from mailroom.gmail import BookmarkExpired, GmailClient, MessageGone, MessageRef
 from mailroom.mime import parse_message
-from mailroom.record import Envelope
+from mailroom.record import Envelope, stored_id
 from mailroom.store import Store, SyncState
 
 FIRST_RUN = timedelta(days=3)
@@ -68,7 +68,8 @@ def _choose(
 
 
 def _store_message(client: GmailClient, store: Store, address: str, ref: MessageRef) -> str | None:
-    if store.get("gmail", ref.id) is not None:
+    kept = stored_id(client.account, ref.id)
+    if store.get("gmail", kept) is not None:
         return None
     try:
         message = client.fetch(ref.id)
@@ -80,13 +81,13 @@ def _store_message(client: GmailClient, store: Store, address: str, ref: Message
     try:
         envelope = Envelope(
             provider="gmail",
-            message_id=ref.id,
-            thread_id=message.thread_id,
+            message_id=kept,
+            thread_id=stored_id(client.account, message.thread_id),
             received_at=message.internal_date,
             link=LINK.format(address=quote(address, safe="@"), message_id=ref.id),
         )
     except ValueError:
         return None
     if store.add(parse_message(message.raw, envelope)):
-        return ref.id
+        return kept
     return None

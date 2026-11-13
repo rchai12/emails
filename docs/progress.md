@@ -136,3 +136,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1o: Single writes and send helper (2026-11-13)
+- Tests: 674 -> 685 (given 11)
+- New public names: `discord_post`: `send_messages`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

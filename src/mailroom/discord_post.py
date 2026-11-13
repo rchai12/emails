@@ -1,3 +1,4 @@
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import httpx
@@ -6,7 +7,7 @@ from mailroom import __version__, keychain
 from mailroom import discord_layout as L
 from mailroom.checkpoint import checkpoint_message
 from mailroom.config import Settings
-from mailroom.store import Store
+from mailroom.store import Post, Store
 
 TIMEOUT_SECONDS = 30.0
 
@@ -27,11 +28,13 @@ def open_discord_http() -> httpx.Client:
     return httpx.Client(timeout=TIMEOUT_SECONDS, trust_env=False, follow_redirects=False)
 
 
-def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostReport:
-    if settings.discord_channel_id == "":
-        raise DiscordUnavailable("not configured") from None
-    store.queue_notified()
-    pending = store.pending_posts()
+def send_messages[T](
+    settings: Settings,
+    http: httpx.Client,
+    pending: Sequence[T],
+    body: Callable[[T], dict[str, object]],
+    mark: Callable[[T, str], object],
+) -> PostReport:
     if not pending:
         return PostReport(posted=0, waiting=0, stopped="")
     token = keychain.get_secret(L.TOKEN_NAME)
@@ -41,12 +44,10 @@ def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostRe
         "User-Agent": L.USER_AGENT.format(version=__version__),
     }
     posted = 0
-    for index, post in enumerate(pending):
-        stored = store.get(post.provider, post.message_id)
-        triaged = store.triage(post.provider, post.message_id)
-        body = checkpoint_message(stored.record, triaged.verdict, post.item_id)
+    for index, item in enumerate(pending):
+        payload = body(item)
         try:
-            response = http.post(url, json=body, headers=headers)
+            response = http.post(url, json=payload, headers=headers)
         except httpx.TransportError:
             return PostReport(posted, len(pending) - index, "network")
         if response.status_code != 200:
@@ -54,9 +55,25 @@ def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostRe
         message_id = _message_id(response)
         if message_id is None:
             return PostReport(posted, len(pending) - index, "response")
-        store.mark_posted(post.item_id, message_id)
+        mark(item, message_id)
         posted += 1
     return PostReport(posted, 0, "")
+
+
+def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostReport:
+    if settings.discord_channel_id == "":
+        raise DiscordUnavailable("not configured") from None
+    store.queue_notified()
+
+    def body(post: Post) -> dict[str, object]:
+        stored = store.get(post.provider, post.message_id)
+        triaged = store.triage(post.provider, post.message_id)
+        return checkpoint_message(stored.record, triaged.verdict, post.item_id)
+
+    def mark(post: Post, message_id: str) -> None:
+        store.mark_posted(post.item_id, message_id)
+
+    return send_messages(settings, http, store.pending_posts(), body, mark)
 
 
 def _message_id(response: httpx.Response) -> str | None:

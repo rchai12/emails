@@ -546,44 +546,46 @@ class Store:
         return _read_problem(row)
 
     def open_problem(self, key: str) -> Problem:
-        found = self.problem(key)
-        if found is not None:
-            return found
         since = _stamp(clock.now())
         self._connection.execute(
-            "INSERT INTO problems (key, since, alerted) VALUES (?, ?, 0)",
+            """
+            INSERT INTO problems (key, since, alerted) VALUES (?, ?, 0)
+            ON CONFLICT (key) DO NOTHING
+            """,
             (key, since),
         )
         self._connection.commit()
-        return Problem(key=key, since=_read_time(since), alerted=False)
+        return cast(Problem, self.problem(key))
 
     def mark_alerted(self, key: str) -> None:
         self._connection.execute("UPDATE problems SET alerted = 1 WHERE key = ?", (key,))
         self._connection.commit()
 
     def close_problem(self, key: str) -> Problem | None:
-        found = self.problem(key)
-        if found is None:
-            return None
-        self._connection.execute("DELETE FROM problems WHERE key = ?", (key,))
+        cursor = self._connection.execute(
+            "DELETE FROM problems WHERE key = ? RETURNING key, since, alerted",
+            (key,),
+        )
+        row = cursor.fetchone()
         self._connection.commit()
-        return found
+        if row is None:
+            return None
+        return _read_problem(row)
 
     def queue_alert(self, key: str, text: str, ping: bool) -> bool:
-        existing = self._connection.execute("SELECT 1 FROM alerts WHERE key = ?", (key,)).fetchone()
-        if existing is not None:
-            return False
+        alert_id = ids.new_id()
         queued_at = _stamp(clock.now())
-        self._connection.execute(
+        cursor = self._connection.execute(
             """
             INSERT INTO alerts (
                 alert_id, key, text, ping, queued_at, discord_message_id, posted_at
             ) VALUES (?, ?, ?, ?, ?, NULL, NULL)
+            ON CONFLICT (key) DO NOTHING
             """,
-            (ids.new_id(), key, text, int(ping), queued_at),
+            (alert_id, key, text, int(ping), queued_at),
         )
         self._connection.commit()
-        return True
+        return cursor.rowcount == 1
 
     def pending_alerts(self) -> tuple[Alert, ...]:
         rows = self._connection.execute(

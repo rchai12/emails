@@ -9,7 +9,7 @@ import httpx
 from mailroom import alerts, clock, discord_post, extractor, gmail, gmail_sync, triage
 from mailroom import discord_layout as L
 from mailroom.config import Settings
-from mailroom.discord_post import DiscordUnavailable
+from mailroom.discord_post import DiscordUnavailable, PostReport
 from mailroom.extractor import ModelUnavailable
 from mailroom.gateway import GatewayStopped, run_gateway
 from mailroom.gmail import GmailAuthError, GmailClient, GmailError
@@ -77,24 +77,10 @@ def run_round(
         health.report("triage", "ok")
         if triaged:
             _model(store, False)
-    try:
-        report = discord_post.post_pending(store, settings, discord_http)
-    except (DiscordUnavailable, KeychainError) as error:
-        health.report("discord posting", str(error))
-    else:
-        if report.stopped:
-            health.report("discord posting", f"waiting ({report.stopped})")
-        else:
-            health.report("discord posting", "ok")
-    try:
-        report = alerts.post_alerts(store, settings, discord_http)
-    except (DiscordUnavailable, KeychainError) as error:
-        health.report("discord alerts", str(error))
-    else:
-        if report.stopped:
-            health.report("discord alerts", f"waiting ({report.stopped})")
-        else:
-            health.report("discord alerts", "ok")
+    _status(
+        health, "discord posting", lambda: discord_post.post_pending(store, settings, discord_http)
+    )
+    _status(health, "discord alerts", lambda: alerts.post_alerts(store, settings, discord_http))
 
 
 def run_service(
@@ -163,6 +149,18 @@ def _listen(
     finally:
         http.close()
         store.close()
+
+
+def _status(health: Health, part: str, call: Callable[[], PostReport]) -> None:
+    try:
+        report = call()
+    except (DiscordUnavailable, KeychainError) as error:
+        health.report(part, str(error))
+        return
+    if report.stopped:
+        health.report(part, f"waiting ({report.stopped})")
+        return
+    health.report(part, "ok")
 
 
 def _gmail(store: Store, account: str, failing: bool) -> None:

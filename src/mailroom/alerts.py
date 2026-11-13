@@ -4,11 +4,11 @@ from datetime import timedelta
 
 import httpx
 
-from mailroom import __version__, clock, keychain
+from mailroom import clock
 from mailroom import discord_layout as L
 from mailroom.config import Settings
-from mailroom.discord_post import DiscordUnavailable, PostReport
-from mailroom.store import Store
+from mailroom.discord_post import DiscordUnavailable, PostReport, send_messages
+from mailroom.store import Alert, Store
 
 MODEL_WAIT = timedelta(minutes=15)
 
@@ -48,44 +48,29 @@ def catch_up_text(account: str, offline: timedelta, count: int, gap: bool) -> st
 def post_alerts(store: Store, settings: Settings, http: httpx.Client) -> PostReport:
     if settings.discord_channel_id == "" or settings.discord_owner_id == "":
         raise DiscordUnavailable("not configured") from None
-    pending = store.pending_alerts()
-    if not pending:
-        return PostReport(posted=0, waiting=0, stopped="")
-    token = keychain.get_secret(L.TOKEN_NAME)
-    url = f"{L.API_URL}/channels/{settings.discord_channel_id}/messages"
-    headers = {
-        "Authorization": f"Bot {token}",
-        "User-Agent": L.USER_AGENT.format(version=__version__),
-    }
     owner = settings.discord_owner_id
-    posted = 0
-    for index, alert in enumerate(pending):
+
+    def body(alert: Alert) -> dict[str, object]:
         if alert.ping:
-            body = {
-                "content": f"<@{owner}> {alert.text}",
-                "allowed_mentions": {"users": [owner]},
-                "nonce": alert.alert_id[:25],
-                "enforce_nonce": True,
-            }
+            content = f"<@{owner}> {alert.text}"
+            mentions: dict[str, object] = {"users": [owner]}
         else:
-            body = {
-                "content": alert.text,
-                "allowed_mentions": {"parse": []},
-                "nonce": alert.alert_id[:25],
-                "enforce_nonce": True,
-            }
-        try:
-            response = http.post(url, json=body, headers=headers)
-        except httpx.TransportError:
-            return PostReport(posted, len(pending) - index, "network")
-        if response.status_code != 200:
-            return PostReport(posted, len(pending) - index, str(response.status_code))
-        message_id = _message_id(response)
-        if message_id is None:
-            return PostReport(posted, len(pending) - index, "response")
-        store.mark_alert_posted(alert.alert_id, message_id)
-        posted += 1
-    return PostReport(posted, 0, "")
+            content = alert.text
+            mentions = {"parse": []}
+        return {
+            "content": content,
+            "allowed_mentions": mentions,
+            "nonce": alert.alert_id[:25],
+            "enforce_nonce": True,
+        }
+
+    return send_messages(
+        settings,
+        http,
+        store.pending_alerts(),
+        body,
+        lambda alert, message_id: store.mark_alert_posted(alert.alert_id, message_id),
+    )
 
 
 def _offline(offline: timedelta) -> str:
@@ -105,13 +90,3 @@ def _found(count: int) -> str:
     if count == 1:
         return "1 new email"
     return f"{count} new emails"
-
-
-def _message_id(response: httpx.Response) -> str | None:
-    try:
-        found = response.json()["id"]
-    except (ValueError, TypeError, KeyError):
-        found = None
-    if isinstance(found, str):
-        return found
-    return None

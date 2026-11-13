@@ -154,3 +154,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - probe-02a.py seed 21 never queues two notified rows while ids.new_id fails after a successful call, so partial stays 0 and the probe does not print FAILURES 0
+
+## Phase 2b: Clearly dated (2026-11-13)
+- Tests: 730 -> 810 (given 80)
+- New public names: `deadlines`: `CONFIDENCE`, `WINDOW`, `read_deadline`, `clearly_dated`
+- Changed files: 2
+- Deviations:
+  - None
+- Follow-ups:
+  - None

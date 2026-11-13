@@ -401,16 +401,28 @@ class FakeDiscord:
 
     Interactions: `press(custom_id)` and `submit(custom_id, value)` return the Gateway's
     INTERACTION_CREATE data for a button press (type 3) or a form submission (type 5, a Label
-    holding a Text Input), from `owner_id` in `channel_id` unless told otherwise.
-    `POST /api/v10/interactions/<id>/<token>/callback` needs the User-Agent but no Authorization.
-    It answers 204,
-    or 404 (code 10062) for an unknown interaction and 400 (code 40060) for a second response.
-    It also answers 400 (code 50035) for a type the interaction can't take: 4, 6, 7 or 9 for a
-    press, and 4, 6 or 7 for a submission. Messages (4, 7) are checked like a new message, with
-    only flag 64 allowed. A form (9) needs a `custom_id` of 1 to 100, a title of 1 to 45, and 1 to
-    5 Labels (type 18, label 1 to 45), each holding a Text Input (type 4) with a `custom_id` of 1
-    to 100, style 1 or 2, lengths within 0 to 4000 and a value of at most 4000. `callbacks` holds
-    every accepted (interaction id, body).
+    holding a Text Input), from `owner_id` in `channel_id` unless told otherwise. `POST
+    /api/v10/interactions/<id>/<token>/callback` needs the User-Agent but no Authorization. It
+    answers 204, or 404 (code 10062) for an unknown interaction and 400 (code 40060) for a second
+    response. It also answers 400 (code 50035) for a type the interaction can't take: 4, 6, 7 or 9
+    for a press, 4, 6 or 7 for a submission, and 4, 5 or 9 for a slash command. Messages (4, 7) are
+    checked like a new message, with only flag 64 allowed. A form (9) needs a `custom_id` of 1 to
+    100, a title of 1 to 45, and 1 to 5 Labels (type 18, label 1 to 45), each holding a Text Input
+    (type 4) with a `custom_id` of 1 to 100, style 1 or 2, lengths within 0 to 4000 and a value of
+    at most 4000. `callbacks` holds every accepted (interaction id, body).
+
+    Commands: `GET /api/v10/applications/@me` returns the application's `id`. `PUT
+    /api/v10/applications/<id>/guilds/<guild_id>/commands` replaces `commands` and returns them
+    with ids, or 404 (code 10004) for another application or server. It also answers 400 (code
+    50035) for a command breaking the documented rules:
+      - type 1, a lower-case `name` of 1 to 32 letters, digits, `-` or `_`
+      - a `description` of 1 to 100
+      - at most 25 options, each type 3 with a lower-case name of 1 to 32 and a description of
+        1 to 100, and lengths within 0 to 6000
+      - `default_member_permissions` a string of digits
+      - names unique
+    More than 200 commands created in a day answers 429. Both need the bot's Authorization.
+    `command(name, address)` builds a slash-command interaction (type 2) like `press`.
     """
 
     API = "https://discord.com/api/v10"
@@ -422,6 +434,10 @@ class FakeDiscord:
         self.requests: list[httpx.Request] = []
         self.failures: list[object] = []
         self.owner_id = "444444444444444444"
+        self.application_id = "222222222222222222"
+        self.guild_id = "333333333333333333"
+        self.commands: list[dict] = []
+        self.created = 0
         self.callbacks: list[tuple[str, dict]] = []
         self._interactions: dict[str, dict] = {}
 
@@ -443,6 +459,19 @@ class FakeDiscord:
             "components": [{"type": 18, "id": 1, "component": text_input}],
         }
         return self._interaction(5, data, user_id, None, "1300000000000000001")
+
+    def command(
+        self,
+        name: str,
+        address: str | None = None,
+        *,
+        user_id: str | None = None,
+        channel_id: str | None = None,
+    ) -> dict:
+        data: dict = {"id": "1500000000000000001", "name": name, "type": 1}
+        if address is not None:
+            data["options"] = [{"type": 3, "name": "address", "value": address}]
+        return self._interaction(2, data, user_id, channel_id, "")
 
     def _interaction(
         self, kind: int, data: dict, user_id: str | None, channel_id: str | None, message_id: str
@@ -480,7 +509,7 @@ class FakeDiscord:
                 400, json={"message": "Interaction has already been acknowledged.", "code": 40060}
             )
         body = json.loads(request.content)
-        allowed = (4, 6, 7, 9) if known["event"]["type"] == 3 else (4, 6, 7)
+        allowed = {2: (4, 5, 9), 3: (4, 6, 7, 9), 5: (4, 6, 7)}[known["event"]["type"]]
         kind = body.get("type")
         data = body.get("data", {})
         if kind not in allowed:
@@ -500,6 +529,66 @@ class FakeDiscord:
         known["answered"] = True
         self.callbacks.append((parts[4], body))
         return httpx.Response(204)
+
+    def _applications(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/api/v10/applications/@me":
+            return httpx.Response(200, json={"id": self.application_id, "name": "mailroom"})
+        path = f"/api/v10/applications/{self.application_id}/guilds/{self.guild_id}/commands"
+        if request.method != "PUT" or request.url.path != path:
+            return httpx.Response(404, json={"message": "Unknown Guild", "code": 10004})
+        body = json.loads(request.content)
+        problem = self._commands_problem(body)
+        if problem:
+            return httpx.Response(
+                400, json={"message": "Invalid Form Body", "code": 50035, "errors": problem}
+            )
+        known = {command["name"] for command in self.commands}
+        self.created += sum(1 for command in body if command["name"] not in known)
+        if self.created > 200:
+            return httpx.Response(429, json={"message": "Max daily application command creates"})
+        self.commands = [
+            {
+                **command,
+                "id": str(1500000000000000001 + index),
+                "application_id": self.application_id,
+            }
+            for index, command in enumerate(body)
+        ]
+        return httpx.Response(200, json=self.commands)
+
+    @staticmethod
+    def _commands_problem(body: object) -> str:
+        if not isinstance(body, list) or len(body) > 100:
+            return "commands"
+        names = [command.get("name", "") for command in body]
+        if len(set(names)) != len(names):
+            return "duplicate name"
+
+        def good_name(name: object) -> bool:
+            allowed = set("abcdefghijklmnopqrstuvwxyz0123456789-_")
+            return isinstance(name, str) and 0 < len(name) <= 32 and set(name) <= allowed
+
+        for command in body:
+            description = command.get("description", "")
+            if command.get("type") != 1 or not good_name(command.get("name")):
+                return "command name"
+            if not 0 < len(description) <= 100:
+                return "command description"
+            permissions = command.get("default_member_permissions", "")
+            if permissions is not None and not str(permissions).isdigit():
+                return "default_member_permissions"
+            options = command.get("options", [])
+            if len(options) > 25:
+                return "options"
+            for option in options:
+                low, high = option.get("min_length", 0), option.get("max_length", 6000)
+                if option.get("type") != 3 or not good_name(option.get("name")):
+                    return "option name"
+                if not 0 < len(option.get("description", "")) <= 100:
+                    return "option description"
+                if not (0 <= low <= 6000 and 1 <= high <= 6000 and low <= high):
+                    return "option lengths"
+        return ""
 
     @staticmethod
     def _form_problem(data: dict) -> str:
@@ -542,6 +631,8 @@ class FakeDiscord:
             return httpx.Response(401, json={"message": "401: Unauthorized", "code": 0})
         if not request.headers.get("user-agent", "").startswith("DiscordBot ("):
             return httpx.Response(403, text="error code: 1010")
+        if request.url.path.startswith("/api/v10/applications/"):
+            return self._applications(request)
         path = f"/api/v10/channels/{self.channel_id}/messages"
         if request.method != "POST" or request.url.path != path:
             return httpx.Response(404, json={"message": "Unknown Channel", "code": 10003})

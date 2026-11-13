@@ -82,3 +82,63 @@ ALREADY_TEXT = "This email is already answered."
 NO_SENDER_TEXT = "This email has no sender address."
 TRUSTED_REPLY = "Added to your trusted senders:"
 BAD_TITLE_TEXT = "A title needs 1 to 100 characters on one line."
+
+# Phase 1k: commands, registered in your server only and hidden from members without admin rights.
+_ADDRESS = {
+    "type": 3,
+    "name": "address",
+    "description": "The exact email address",
+    "required": True,
+    "min_length": 3,
+    "max_length": 254,
+}
+COMMANDS = (
+    {
+        "type": 1,
+        "name": "trust",
+        "description": "Trust a sender's exact address",
+        "options": [_ADDRESS],
+        "default_member_permissions": "0",
+    },
+    {
+        "type": 1,
+        "name": "untrust",
+        "description": "Remove an address from your trusted senders",
+        "options": [_ADDRESS],
+        "default_member_permissions": "0",
+    },
+    {
+        "type": 1,
+        "name": "trusted",
+        "description": "List your trusted senders",
+        "default_member_permissions": "0",
+    },
+    {
+        "type": 1,
+        "name": "unmute",
+        "description": "Stop dropping a muted sender's mail",
+        "options": [_ADDRESS],
+        "default_member_permissions": "0",
+    },
+    {
+        "type": 1,
+        "name": "muted",
+        "description": "List your muted senders",
+        "default_member_permissions": "0",
+    },
+)
+ADDRESS_OPTION = "address"
+
+NOT_YOURS_TEXT = "Only the owner can use this here."
+BAD_ADDRESS_TEXT = "That is not an email address."
+UNTRUSTED_REPLY = "Removed from your trusted senders:"
+NOT_TRUSTED_REPLY = "Not on your trusted senders:"
+UNMUTED_REPLY = "No longer muted:"
+NOT_MUTED_REPLY = "Not on your muted senders:"
+TRUSTED_LIST = "Your trusted senders:"
+MUTED_LIST = "Your muted senders:"
+NONE_TRUSTED = "You have no trusted senders."
+NONE_MUTED = "You have no muted senders."
+LIST_LIMIT = 1800
+MORE_TEXT = "...and {count} more."
+REGISTERED_TEXT = "Registered {count} commands in your server."

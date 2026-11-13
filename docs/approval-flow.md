@@ -39,6 +39,8 @@ The trusted list starts empty and grows as you use the service.
 
 - **Adding.** Tap Trust sender on any notification, or use a Discord command such as `/trust name@example.com` to add someone before they've emailed.
 - **Removing.** `/untrust name@example.com`. `/trusted` lists everyone on the list.
+- **Muted senders.** Mute sender is a button; `/unmute name@example.com` lets a sender's mail through again, and `/muted` lists them.
+- **Setup.** `mailroom discord-commands` registers the commands in your server once; they are hidden from members without admin rights.
 - **Effect.** A trusted sender's mail is never dropped by the bulk-mail rules and always reaches the extractor. It still needs your approval like any other email; auto-creating tasks for trusted senders is [deferred](roadmap.md#deferred-items).
 - **Matching.** Trust applies to an exact email address, not a whole domain, so a look-alike address isn't trusted by accident.
 - **Verified senders only.** The email must also pass the provider's authentication checks, so a forged "From" address doesn't count as trusted (see [Triage](triage.md#pipeline)).

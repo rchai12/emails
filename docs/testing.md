@@ -42,6 +42,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `checkpoint.py` and `discord_post.py` (what email text Discord shows; each email posted once, never lost; Phase 1h)
 - `interactions.py` (who can answer, what is recorded, what text goes back to Discord; Phase 1i)
 - `gateway.py` (the bot token, where the Gateway connects, and that a fatal close stops; Phase 1j)
+- `commands.py` (who is trusted or muted, and what goes back to Discord; Phase 1k)
 
 ## Commands
 

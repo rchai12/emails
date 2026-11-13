@@ -121,7 +121,7 @@ def random_plan() -> dict:
     if kind == "no_ack":
         return {"no_ack": True}
     if kind == "close":
-        return {"then": ("close", rng.choice([1000, 1001, 1006, 4000, 4008, 4009])), "after": after}
+        return {"then": ("close", rng.choice([1000, 1001, 1006, 4000, 4009])), "after": after}
     if kind == "invalid":
         return {"then": ("invalid", rng.random() < 0.5), "after": after}
     if kind == "reconnect":
@@ -186,6 +186,7 @@ def the_client_follows_the_model() -> object:
         if len(discord.callbacks) != delivered:
             return f"trial {trial}: {len(discord.callbacks)} replies for {delivered} presses"
         for connection in gateway.connections:
+            # Only the fake's own complaints; the plans never schedule these codes.
             if connection.close_code in (4002, 4007, 4008):
                 return f"trial {trial}: the fake closed {connection.close_code}"
             if gateway.token in connection.url:

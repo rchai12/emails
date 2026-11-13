@@ -1,38 +1,32 @@
 from mailroom import discord_layout as L
 from mailroom.record import Record, account_of
-from mailroom.store import Verdict
+from mailroom.store import Approval, Due, Verdict
 
 
 def _block(text: str) -> str:
     return "```\n" + text.replace(L.BACKTICK, L.BACKTICK_STAND_IN) + "\n```"
 
 
-def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
+def _identity_fields(record: Record) -> list[dict[str, str]]:
     address = record.sender if record.sender else L.NO_ADDRESS
     sender = f"{record.sender_name} <{address}>" if record.sender_name else address
     subject = record.subject if record.subject else L.NO_SUBJECT
-    extraction = verdict.extraction
-    if extraction is not None and extraction.suspicious:
-        color = L.COLOR_SUSPECTED
-    elif extraction is None:
-        color = L.COLOR_UNREAD
-    else:
-        color = L.COLOR_NORMAL
-    if extraction is not None:
-        summary = _block(extraction.summary)
-    elif verdict.outcome == "rejected":
-        summary = L.UNREAD_TEXT.replace("{reason}", verdict.reason)
-    else:
-        summary = L.EXPIRED_TEXT
-    fields: list[dict[str, str]] = [
+    return [
         {"name": L.FROM_NAME, "value": _block(sender)},
         {"name": L.SUBJECT_NAME, "value": _block(subject)},
-        {"name": L.SUMMARY_NAME, "value": summary},
     ]
-    if extraction is not None and extraction.title:
-        fields.append({"name": L.TASK_NAME, "value": _block(extraction.title)})
+
+
+def _colour(verdict: Verdict) -> int:
+    extraction = verdict.extraction
     if extraction is not None and extraction.suspicious:
-        fields.append({"name": L.WARNING_NAME, "value": _block(extraction.suspicion_reason)})
+        return L.COLOR_SUSPECTED
+    if extraction is None:
+        return L.COLOR_UNREAD
+    return L.COLOR_NORMAL
+
+
+def _footer(record: Record, verdict: Verdict) -> str:
     if verdict.trusted:
         standing = L.TRUSTED_TEXT
     elif verdict.verified:
@@ -43,28 +37,67 @@ def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[s
     account = account_of(record.message_id)
     if account is not None:
         provider = f"{provider} {account}"
-    footer = [provider, standing]
+    parts = [provider, standing]
     if verdict.bulk:
-        footer.append(L.BULK_TEXT)
+        parts.append(L.BULK_TEXT)
+    return L.FOOTER_JOIN.join(parts)
+
+
+def _button(action: str, label: str, style: int, item_id: str) -> dict[str, object]:
+    return {
+        "type": 2,
+        "style": style,
+        "label": label,
+        "custom_id": f"{L.PREFIX}:{action}:{item_id}",
+    }
+
+
+def _open_button(record: Record) -> dict[str, object] | None:
+    if len(record.link) > L.LINK_LIMIT:
+        return None
+    return {"type": 2, "style": L.LINK_STYLE, "label": L.OPEN_LABEL, "url": record.link}
+
+
+def _deadline_line(due: Due | None, missing: str) -> str:
+    if due is None:
+        return missing
+    shown = due.date.strftime(L.DATE_FORMAT)
+    if due.time is not None:
+        shown += due.time.strftime(L.TIME_FORMAT)
+    return shown
+
+
+def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
+    extraction = verdict.extraction
+    if extraction is not None:
+        summary = _block(extraction.summary)
+    elif verdict.outcome == "rejected":
+        summary = L.UNREAD_TEXT.replace("{reason}", verdict.reason)
+    else:
+        summary = L.EXPIRED_TEXT
+    fields: list[dict[str, str]] = [
+        *_identity_fields(record),
+        {"name": L.SUMMARY_NAME, "value": summary},
+    ]
+    if extraction is not None and extraction.title:
+        fields.append({"name": L.TASK_NAME, "value": _block(extraction.title)})
+    if extraction is not None and extraction.suspicious:
+        fields.append({"name": L.WARNING_NAME, "value": _block(extraction.suspicion_reason)})
     answers = [
-        {
-            "type": 2,
-            "style": style,
-            "label": label,
-            "custom_id": f"{L.PREFIX}:{action}:{item_id}",
-        }
+        _button(action, label, style, item_id)
         for action, label, style in (*L.FIRST_ROW, *L.SECOND_ROW)
     ]
     second = answers[len(L.FIRST_ROW) :]
-    if len(record.link) <= L.LINK_LIMIT:
-        second.append({"type": 2, "style": L.LINK_STYLE, "label": L.OPEN_LABEL, "url": record.link})
+    open_email = _open_button(record)
+    if open_email is not None:
+        second.append(open_email)
     return {
         "embeds": [
             {
                 "title": L.TITLE,
-                "color": color,
+                "color": _colour(verdict),
                 "fields": fields,
-                "footer": {"text": L.FOOTER_JOIN.join(footer)},
+                "footer": {"text": _footer(record, verdict)},
             }
         ],
         "components": [
@@ -88,10 +121,78 @@ def answered_message(
     embed["fields"].append({"name": L.ANSWER_NAME, "value": shown})
     full = card["components"][0]["components"][0]
     row = [full]
-    if len(record.link) <= L.LINK_LIMIT:
-        row.append({"type": 2, "style": L.LINK_STYLE, "label": L.OPEN_LABEL, "url": record.link})
+    open_email = _open_button(record)
+    if open_email is not None:
+        row.append(open_email)
     return {
         "embeds": [embed],
+        "components": [{"type": 1, "components": row}],
+        "allowed_mentions": {"parse": []},
+    }
+
+
+def checkpoint2_message(
+    record: Record, verdict: Verdict, item_id: str, title: str
+) -> dict[str, object]:
+    fields: list[dict[str, str]] = [
+        *_identity_fields(record),
+        {"name": L.TASK_NAME, "value": _block(title)},
+        {"name": L.DEADLINE_NAME, "value": _deadline_line(verdict.due, L.NO_PROPOSAL_TEXT)},
+    ]
+    if verdict.due is not None:
+        extraction = verdict.extraction
+        evidence = L.EVIDENCE_EXPIRED if extraction is None else _block(extraction.deadline.quote)
+        fields.append({"name": L.EVIDENCE_NAME, "value": evidence})
+    extraction = verdict.extraction
+    if extraction is not None and extraction.suspicious:
+        fields.append({"name": L.WARNING_NAME, "value": _block(extraction.suspicion_reason)})
+    buttons = [
+        _button(action, label, style, item_id)
+        for action, label, style in L.SECOND_BUTTONS
+        if action != "approve" or verdict.due is not None
+    ]
+    components: list[dict[str, object]] = [{"type": 1, "components": buttons}]
+    open_email = _open_button(record)
+    if open_email is not None:
+        components.append({"type": 1, "components": [open_email]})
+    return {
+        "embeds": [
+            {
+                "title": L.SECOND_TITLE,
+                "color": _colour(verdict),
+                "fields": fields,
+                "footer": {"text": _footer(record, verdict)},
+            }
+        ],
+        "components": components,
+        "allowed_mentions": {"parse": []},
+    }
+
+
+def approved_message(
+    record: Record, verdict: Verdict, item_id: str, approval: Approval
+) -> dict[str, object]:
+    fields = [*_identity_fields(record)]
+    if approval.outcome != "drop":
+        fields.append({"name": L.TASK_NAME, "value": _block(approval.title)})
+        fields.append(
+            {"name": L.DEADLINE_NAME, "value": _deadline_line(approval.due, L.NO_DEADLINE_TEXT)}
+        )
+    fields.append({"name": L.ANSWER_NAME, "value": L.APPROVAL_TEXT[approval.outcome]})
+    action, label, style = L.SECOND_BUTTONS[0]
+    row: list[dict[str, object]] = [_button(action, label, style, item_id)]
+    open_email = _open_button(record)
+    if open_email is not None:
+        row.append(open_email)
+    return {
+        "embeds": [
+            {
+                "title": L.SECOND_TITLE,
+                "color": _colour(verdict),
+                "fields": fields,
+                "footer": {"text": _footer(record, verdict)},
+            }
+        ],
         "components": [{"type": 1, "components": row}],
         "allowed_mentions": {"parse": []},
     }

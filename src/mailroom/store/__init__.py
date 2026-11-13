@@ -1,6 +1,8 @@
 from mailroom.config import Settings, prepare_data_dir
 from mailroom.store.alerts import Alert, Problem
 from mailroom.store.alerts import AlertStore as _AlertStore
+from mailroom.store.approvals import Approval
+from mailroom.store.approvals import ApprovalStore as _ApprovalStore
 from mailroom.store.base import DB_FILENAME, SCHEMA_MESSAGE, StoreError
 from mailroom.store.messages import TEXT_RETENTION, StoredMessage
 from mailroom.store.messages import MessageStore as _MessageStore
@@ -22,6 +24,7 @@ __all__ = [
     "TEXT_RETENTION",
     "Alert",
     "Answer",
+    "Approval",
     "Post",
     "Problem",
     "Store",
@@ -34,7 +37,15 @@ __all__ = [
 ]
 
 
-class Store(_MessageStore, _SyncStore, _SenderStore, _TriageStore, _PostStore, _AlertStore):
+class Store(
+    _MessageStore,
+    _SyncStore,
+    _SenderStore,
+    _TriageStore,
+    _PostStore,
+    _AlertStore,
+    _ApprovalStore,
+):
     pass
 
 

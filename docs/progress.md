@@ -172,3 +172,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 2d: Checkpoint 2 (2026-11-13)
+- Tests: 832 -> 901 (given 67)
+- New public names: `store`: `Approval`, `record_approval`, `approval`; `checkpoint`: `checkpoint2_message`, `approved_message`
+- Changed files: 7
+- Deviations:
+  - None
+- Follow-ups:
+  - None

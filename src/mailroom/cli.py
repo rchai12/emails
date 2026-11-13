@@ -2,7 +2,10 @@ import webbrowser
 
 import typer
 
-from mailroom import __version__, gmail_login
+from mailroom import __version__, commands, discord_post, gmail_login
+from mailroom import discord_layout as L
+from mailroom.config import ConfigError, get_settings
+from mailroom.discord_post import DiscordUnavailable
 from mailroom.gmail import GmailError
 from mailroom.keychain import KeychainError
 
@@ -41,3 +44,23 @@ def gmail_login_command(account: str, new_client: bool = False) -> None:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from None
     typer.echo(f"Signed in: {account} ({signed_in})")
+
+
+@app.command("discord-commands")
+def discord_commands() -> None:
+    """Register the slash commands in your server."""
+    try:
+        count = _registered()
+    except (DiscordUnavailable, KeychainError, ConfigError) as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(L.REGISTERED_TEXT.format(count=count))
+
+
+def _registered() -> int:
+    settings = get_settings()
+    http = discord_post.open_discord_http()
+    try:
+        return commands.register_commands(settings, http)
+    finally:
+        http.close()

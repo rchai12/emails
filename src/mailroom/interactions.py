@@ -5,6 +5,7 @@ import httpx
 from mailroom import __version__
 from mailroom import discord_layout as L
 from mailroom.checkpoint import _block, answered_message
+from mailroom.commands import handle_command
 from mailroom.config import Settings
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.record import Record
@@ -12,6 +13,7 @@ from mailroom.store import Store, Verdict
 
 _PRESS_ACTIONS = frozenset({"full", "yes", "edit", "notask", "mute", "trust"})
 _BAD_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_COMMAND_NAMES = tuple(command["name"] for command in L.COMMANDS)
 
 
 def handle_interaction(
@@ -20,6 +22,8 @@ def handle_interaction(
     if settings.discord_owner_id == "" or settings.discord_channel_id == "":
         raise DiscordUnavailable("not configured") from None
     kind = event["type"]
+    if kind == 2:
+        return _slash(event, store, settings, http)
     if kind not in (3, 5):
         return "ignored"
     action, item_id = _button(event)
@@ -70,6 +74,20 @@ def handle_interaction(
         },
     )
     return "answered"
+
+
+def _slash(event: dict[str, object], store: Store, settings: Settings, http: httpx.Client) -> str:
+    if event["data"]["name"] not in _COMMAND_NAMES:
+        return "ignored"
+    if (
+        _presser(event) != settings.discord_owner_id
+        or event.get("channel_id") != settings.discord_channel_id
+    ):
+        _send(http, event, _private(L.NOT_YOURS_TEXT))
+        return "refused"
+    outcome, text = handle_command(event, store)
+    _send(http, event, _private(text))
+    return outcome
 
 
 def _presser(event: dict[str, object]) -> str:

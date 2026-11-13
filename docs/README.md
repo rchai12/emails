@@ -18,5 +18,6 @@ The email service watches Gmail, live.com and yahoo.com, finds messages that nee
 | [Interfaces](interfaces.md) | The approved task sent to the tasks app and the read-only MCP tools |
 | [Roadmap](roadmap.md) | Build order, acceptance tests and deferred items |
 | [Open questions](open-questions.md) | Decisions still to make before building |
+| [Phase 1 audit](phase-01-audit.md) | Alignment, file size, duplication, and residual risk after Phases 0 to 1m |
 
 The original single document is kept in [archive/](archive/Email%20Service%20Feature%20Decisions.md) for reference. These docs replace it.

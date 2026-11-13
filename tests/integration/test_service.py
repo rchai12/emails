@@ -153,14 +153,12 @@ def test_one_broken_account_does_not_stop_the_others(
     assert len(world.discord.messages) == 1
 
 
-def test_a_missing_secret_is_reported_by_name(
+def test_a_missing_gmail_secret_asks_for_sign_in(
     store: Store, settings: Settings, fake_keychain: FakeKeychain
 ) -> None:
     world = World(fake_keychain, ("personal",))
     del fake_keychain.secrets[("mailroom", "gmail.personal.refresh-token")]
-    assert world.round(store, settings)[0] == (
-        "gmail personal: secret not found: gmail.personal.refresh-token"
-    )
+    assert world.round(store, settings)[0] == "gmail personal: gmail sign-in needed: personal"
 
 
 def test_an_unreachable_model_leaves_mail_for_the_next_round(

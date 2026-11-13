@@ -25,7 +25,7 @@ From Python 3.12, pydantic-settings 2.16 and SQLite on this machine.
 - **Signals.** launchd stops a service with SIGTERM. `signal.signal` may be called only from the main thread, and a handler that sets the event replaces Python's default (KeyboardInterrupt for SIGINT).
 - **List settings.** pydantic-settings decodes a tuple-typed setting from the environment as JSON, so `personal, work` fails with `SettingsError` before any validator runs. `Annotated[tuple[str, ...], NoDecode]` with a `mode="before"` validator that splits on commas works.
 - **What each part raises** (earlier phases):
-  - `sync_gmail`: `GmailError` subclasses (`GmailAuthError` "gmail sign-in needed: <account>", `GmailUnavailable`), or `KeychainError` for a missing secret
+  - `sync_gmail`: `GmailError` subclasses (`GmailAuthError` "gmail sign-in needed: <account>", `GmailUnavailable`). A missing Gmail secret is a `GmailAuthError` too (1b, `GmailClient._refresh`); `KeychainError` comes only when the Keychain itself can't be read
   - `triage_message`: `ModelUnavailable`
   - `post_pending`: `DiscordUnavailable` or `KeychainError`
   - `run_gateway`: `GatewayStopped`, `DiscordUnavailable` or `KeychainError`
@@ -175,3 +175,12 @@ git grep --untracked -n -E 'print\(|logging|logger|warnings\.warn' -- src ':!src
 git grep --untracked -n -E 'datetime\.now|datetime\.utcnow|date\.today|time\.time\(|uuid|from mailroom\.(clock|ids) import' -- src ':!src/mailroom/clock.py' ':!src/mailroom/ids.py'
 git grep --untracked -n -E 'pragma: no cover|noqa' -- src/mailroom/service.py src/mailroom/config.py src/mailroom/cli.py
 ```
+
+## Corrections
+
+From the first review (`docs/reviews/phase-01l-service-loop.md`, FAIL).
+
+- **The spec was wrong about a missing Gmail secret.** The Facts said it reaches the service as `KeychainError`, but the Gmail client (1b) has always turned it into `GmailAuthError`, so the status line is `gmail personal: gmail sign-in needed: personal`. The Facts are corrected. The given test is renamed `test_a_missing_gmail_secret_asks_for_sign_in` and now expects that line; it is still a given file. Requirement 3 is unchanged: `run_round` already reports `str(error)` for both errors.
+- **Still to do (not the spec's fault):** requirement 7, the `## Phase 1l: Service loop (YYYY-MM-DD)` progress entry.
+
+With the corrected test, all 22 given tests pass against the current code, and `probe-01l.py` prints `FAILURES 0`.

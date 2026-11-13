@@ -1,10 +1,11 @@
 import re
 from pathlib import Path
+from typing import Annotated, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DATA_DIR_MESSAGE = "MAILROOM_DATA_DIR must be an absolute path"
 EXTRACTOR_URL_MESSAGE = (
@@ -16,9 +17,12 @@ DISCORD_CHANNEL_MESSAGE = (
 )
 DISCORD_OWNER_MESSAGE = "MAILROOM_DISCORD_OWNER_ID must be a Discord user id (17 to 20 digits)"
 DISCORD_GUILD_MESSAGE = "MAILROOM_DISCORD_GUILD_ID must be a Discord server id (17 to 20 digits)"
+GMAIL_ACCOUNTS_MESSAGE = "MAILROOM_GMAIL_ACCOUNTS must be account names separated by commas"
+POLL_MESSAGE = "MAILROOM_POLL_SECONDS must be a whole number from 30 to 600"
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
 _CHANNEL_ID = re.compile(r"[0-9]{17,20}")
+_ACCOUNT = re.compile(r"[a-z][a-z0-9-]{0,31}")
 _FIELD_MESSAGES = {
     "data_dir": DATA_DIR_MESSAGE,
     "extractor_url": EXTRACTOR_URL_MESSAGE,
@@ -26,6 +30,8 @@ _FIELD_MESSAGES = {
     "discord_channel_id": DISCORD_CHANNEL_MESSAGE,
     "discord_owner_id": DISCORD_OWNER_MESSAGE,
     "discord_guild_id": DISCORD_GUILD_MESSAGE,
+    "gmail_accounts": GMAIL_ACCOUNTS_MESSAGE,
+    "poll_seconds": POLL_MESSAGE,
 }
 
 
@@ -61,6 +67,8 @@ class Settings(BaseSettings):
     discord_channel_id: str = ""
     discord_owner_id: str = ""
     discord_guild_id: str = ""
+    gmail_accounts: Annotated[tuple[str, ...], NoDecode] = ()
+    poll_seconds: int = 60
 
     @field_validator("data_dir", mode="before")
     @classmethod
@@ -108,6 +116,26 @@ class Settings(BaseSettings):
         if value == "" or _CHANNEL_ID.fullmatch(value):
             return value
         raise ValueError(DISCORD_GUILD_MESSAGE)
+
+    @field_validator("gmail_accounts", mode="before")
+    @classmethod
+    def _check_gmail_accounts(cls, value: object) -> tuple[str, ...]:
+        if value == () or value == "":
+            return ()
+        names = tuple(part.strip() for part in cast(str, value).split(","))
+        seen: set[str] = set()
+        for name in names:
+            if _ACCOUNT.fullmatch(name) is None or name in seen:
+                raise ValueError(GMAIL_ACCOUNTS_MESSAGE)
+            seen.add(name)
+        return names
+
+    @field_validator("poll_seconds")
+    @classmethod
+    def _check_poll_seconds(cls, value: int) -> int:
+        if 30 <= value <= 600:
+            return value
+        raise ValueError(POLL_MESSAGE)
 
 
 def get_settings() -> Settings:

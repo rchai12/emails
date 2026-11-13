@@ -1,8 +1,10 @@
+import signal
+import threading
 import webbrowser
 
 import typer
 
-from mailroom import __version__, commands, discord_post, gmail_login
+from mailroom import __version__, commands, discord_post, gmail_login, service
 from mailroom import discord_layout as L
 from mailroom.config import ConfigError, get_settings
 from mailroom.discord_post import DiscordUnavailable
@@ -64,3 +66,25 @@ def _registered() -> int:
         return commands.register_commands(settings, http)
     finally:
         http.close()
+
+
+@app.command()
+def run() -> None:
+    """Run the mail service until it is stopped."""
+    try:
+        settings = get_settings()
+    except ConfigError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from None
+    stop = threading.Event()
+
+    def _stop(_number: int, _frame: object) -> None:
+        stop.set()
+
+    signal.signal(signal.SIGTERM, _stop)
+    signal.signal(signal.SIGINT, _stop)
+    try:
+        service.run_service(settings, say=lambda line: typer.echo(line, err=True), stop=stop)
+    except service.ServiceError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from None

@@ -109,3 +109,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1l: Service loop (2026-11-12)
+- Tests: 580 -> 607 (given 22)
+- New public names: `config`: `GMAIL_ACCOUNTS_MESSAGE`, `POLL_MESSAGE`, `gmail_accounts`, `poll_seconds`; `service`: `ServiceError`, `Health`, `run_round`, `run_service`; `cli`: `run`
+- Changed files: 10
+- Deviations:
+  - None
+- Follow-ups:
+  - None

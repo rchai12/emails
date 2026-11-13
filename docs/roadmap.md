@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1m done. The [Phase 1 audit](phase-01-audit.md) lists fixes to settle before stage 2; two of them wait on [open questions](open-questions.md).
+Status: Phases 0 to 1m done. The [Phase 1 audit](phase-01-audit.md)'s fixes come next, as 1n and 1o; splitting `store.py` opens stage 2.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -24,6 +24,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1k** the `/trust`, `/untrust`, `/trusted`, `/unmute` and `/muted` commands, registered by `mailroom discord-commands`. Done.
    - **1l** `mailroom run`: the poll loop and the Gateway listener as one service, each part failing on its own. Done.
    - **1m** Discord alerts: a credential stopped working, the Gateway stopped, the model unreachable for a while, and the catch-up summary. Done.
+   - **1n** fixes from the [Phase 1 audit](phase-01-audit.md), part 1: ids written `<account>/<provider id>` and the account on the card, and the data folder excluded from Time Machine.
+   - **1o** fixes from the audit, part 2: single-statement inserts for problems and alerts, and one shared Discord send helper for cards and alerts.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
 3. **Send approved tasks to the real tasks app.**

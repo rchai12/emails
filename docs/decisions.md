@@ -16,10 +16,12 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Extractor model | Local model of 27B parameters or more, such as Qwen 3.6 or 3.8 | Fits on the Mac Studio and keeps email text local | Small models; hosted models |
 | Flagging | The Discord notification is the flag | Read-only access can't label mail | Labels in the mailbox (needs write access) |
 | Retention | Email text deleted after 24 hours | Keeps as little personal data as possible | Keeping bodies indefinitely |
+| Backups | The data folder is excluded from Time Machine | Backups would otherwise keep email text past 24 hours | Backing it up and accepting the gap |
 | State storage | One local SQLite database, no vector search in v1 | Every lookup is exact; embeddings would leak email text past 24 hours | A database server; a vector store |
 | Database access | Standard library `sqlite3`, plain SQL, numbered migrations | No dependency; every query visible and testable | SQLAlchemy and Alembic |
 | HTTP client | httpx for every outside REST call (Gmail, Graph, the local model, Discord, the tasks app) | One small library; plain REST calls; tests fake it with no network | Google's client library; the standard library |
-| Accounts | One per provider in v1, every secret and bookmark keyed by an account name | A second account later is configuration, not code | A single fixed account |
+| Accounts | Several per provider (at least two Gmail accounts); every secret and bookmark keyed by an account name, and every stored message and thread id written `<account>/<provider id>` | Two mailboxes can never collide, with one change at sync and none downstream | One account per provider; an `account` column in every table's key |
+| Mailbox on the card | The card footer names the account (`Gmail personal`) | You know which inbox it came to | Provider only |
 | Mail gone before fetch | Skipped: only mail still in the inbox (not spam or trash) when fetched is stored | You've already dealt with it; a deleted message can't block the sync | Triaging anything that was ever in the inbox |
 | Gmail link | `authuser=<address>` picks the account | Opens the right mailbox with several Google accounts signed in | `u/0`, the first signed-in account |
 | Gmail login | A one-request listener on 127.0.0.1 receives Google's answer, with PKCE | What Google expects for desktop apps; no pasting | Pasting the redirect address |

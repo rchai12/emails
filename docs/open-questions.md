@@ -1,11 +1,11 @@
 # Open Questions
 
 - [ ] **Sender score.** Every "Not a task" answer is recorded (Phase 1i), but what a lower score changes is not decided yet. Decide once the service has been used for a while.
-- [ ] **Backups and retention.** Email text is overwritten in the live database after 24 hours, but Time Machine keeps earlier copies of the data folder. Excluding the folder from backups keeps the promise; the cost is that after a restore the dedup keys and Gmail bookmarks are gone, so the first run rereads 3 days of inbox and notifies those emails again. Found by the [Phase 1 audit](phase-01-audit.md) (Nov 13, 2026).
-- [ ] **More than one Gmail account.** Mail is keyed by provider and message id, not by account, so a second Gmail account's message with the same id as the first's would be silently skipped. Either limit Gmail to one account for now (matching [Decisions](decisions.md)), or add the account to the keys before real data builds up. Found by the [Phase 1 audit](phase-01-audit.md) (Nov 13, 2026).
 
 ## Resolved
 
+- [x] **More than one Gmail account.** At least two Gmail accounts will be used. Stored message and thread ids are written `<account>/<provider id>`, so two mailboxes can't collide, and the card footer names the account. Built in Phase 1n. See [Decisions](decisions.md) (Nov 13, 2026).
+- [x] **Backups and retention.** The data folder is excluded from Time Machine, so email text is gone 24 hours after fetch in backups too. After a restore, the first run rereads 3 days of inbox and may notify those emails again. Built in Phase 1n. See [Decisions](decisions.md) (Nov 13, 2026).
 - [x] **Restarts.** launchd keeps the service running, and the email subagent reports on Discord if it can't reach the service. See [Architecture](architecture.md#keeping-it-running) (Nov 11, 2026).
 - [x] **Notification cap.** No cap. In busy hours notifications are batched into digests ranked from most to least important. See [Approval flow](approval-flow.md#busy-hours-batching) (Nov 11, 2026).
 - [x] **Second checkpoint.** The email service runs every checkpoint and sends the tasks app only fully approved tasks (Nov 11, 2026).

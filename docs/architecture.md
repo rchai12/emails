@@ -52,7 +52,7 @@ Every adapter produces the same record shape, so triage never knows which provid
 
 ## Database
 
-All service state lives in one SQLite database (`mailroom.sqlite3` in the data folder): a single local file, with no separate server to run or secure. Today Time Machine backs it up with the rest of the Mac, so backups keep email text past 24 hours; whether to exclude the data folder is an [open question](open-questions.md).
+All service state lives in one SQLite database (`mailroom.sqlite3` in the data folder): a single local file, with no separate server to run or secure. It is excluded from Time Machine (from Phase 1n), so no backup keeps email text past 24 hours; after a restore the service starts fresh and rereads 3 days of inbox.
 
 - **Private.** The file has mode `0o600`, inside the `0o700` data folder.
 - **Cleared text leaves the file.** `secure_delete` is on, so cleared text is overwritten rather than left in free pages, and the default rollback journal is kept, so no write-ahead log holds old text.

@@ -51,14 +51,17 @@ Only you. Every button press and command is checked against your Discord user ID
 
 ## Checkpoint 2: confirm the deadline
 
-The message shows the proposed title, the deadline and the evidence quote it came from.
+When you press Yes (or submit a title), the same card turns into checkpoint 2 in place. It shows the title, the deadline proposed at triage, and the evidence quote it came from (or "The evidence has expired." after 24 hours). If the card's update is lost, pressing Yes again on the old card shows checkpoint 2 again.
 
 | Button | Result |
 | --- | --- |
 | Show full text | Same as at checkpoint 1 |
-| Approve | The approved task is sent to the tasks app with the proposed deadline |
-| Edit | You change the title or deadline first, then it is sent |
+| Approve | The approved task is sent to the tasks app with the proposed deadline (shown only when a deadline was proposed) |
+| Edit | A form with the title and the deadline. Type the deadline as you would say it ("Nov 20 at 5 pm", "Friday", "tomorrow", "2026-11-20"); code reads it with the same reader as the clearly-dated rule, and anything it can't read is refused privately. Leave it empty for no deadline |
 | No deadline | The approved task is sent without a deadline |
+| Not a task | Item is closed, as at checkpoint 1 |
+
+Your decision is recorded once (Phase 2d), and the card then shows it with only Show full text and Open email left.
 
 The email service runs this checkpoint itself, the same as checkpoint 1. The tasks app doesn't ask you again; it receives a task you have already approved.
 

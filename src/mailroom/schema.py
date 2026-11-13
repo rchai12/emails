@@ -124,6 +124,25 @@ MIGRATIONS: tuple[str, ...] = (
             AND (dated = 0 OR (outcome = 'extracted' AND deadline_date IS NOT NULL))
         );
     """,
+    # 9: the owner's checkpoint 2 decision for an item answered Yes; the title is the one approved.
+    """
+    CREATE TABLE approvals (
+        item_id TEXT PRIMARY KEY,
+        outcome TEXT NOT NULL CHECK (outcome IN ('approve', 'change', 'nodeadline', 'drop')),
+        title TEXT NOT NULL,
+        deadline_date TEXT
+            CHECK (deadline_date IS NULL OR date(deadline_date) IS deadline_date),
+        deadline_time TEXT
+            CHECK (
+                deadline_time IS NULL
+                OR (deadline_date IS NOT NULL AND strftime('%H:%M', deadline_time) IS deadline_time)
+            ),
+        decided_at TEXT NOT NULL,
+        CHECK ((outcome = 'drop') = (title = '')),
+        CHECK (outcome != 'approve' OR deadline_date IS NOT NULL),
+        CHECK (outcome NOT IN ('nodeadline', 'drop') OR deadline_date IS NULL)
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

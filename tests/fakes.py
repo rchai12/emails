@@ -452,12 +452,25 @@ class FakeDiscord:
         data = {"custom_id": custom_id, "component_type": 2}
         return self._interaction(3, data, user_id, channel_id, message_id)
 
-    def submit(self, custom_id: str, value: str, *, user_id: str | None = None) -> dict:
-        text_input = {"type": 4, "id": 2, "custom_id": "title", "value": value}
-        data = {
-            "custom_id": custom_id,
-            "components": [{"type": 18, "id": 1, "component": text_input}],
-        }
+    def submit(
+        self,
+        custom_id: str,
+        value: str,
+        *,
+        user_id: str | None = None,
+        fields: dict[str, str] | None = None,
+    ) -> dict:
+        """A form submission. Discord sends every text input, an empty one with value ""."""
+        values = {"title": value, **(fields or {})}
+        labels = [
+            {
+                "type": 18,
+                "id": 1 + 2 * n,
+                "component": {"type": 4, "id": 2 + 2 * n, "custom_id": key, "value": text},
+            }
+            for n, (key, text) in enumerate(values.items())
+        ]
+        data = {"custom_id": custom_id, "components": labels}
         return self._interaction(5, data, user_id, None, "1300000000000000001")
 
     def command(

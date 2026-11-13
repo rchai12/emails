@@ -159,3 +159,34 @@ ALERT_MODEL_FIXED = "The local model is back. Waiting mail is being triaged."
 ALERT_CATCH_UP = "Gmail {account} caught up after {offline} offline: {found}."
 ALERT_GAP = " It was offline for more than 14 days, so check older mail in Gmail yourself."
 LESS_THAN_AN_HOUR = "less than an hour"
+
+# Phase 2d: checkpoint 2. The card the owner pressed turns into this after Yes or a submitted
+# title; the button actions are new, so a checkpoint 1 press can never be read as one of these.
+SECOND_TITLE = "Confirm the deadline"
+SECOND_BUTTONS = (
+    ("full", "Show full text", 2),
+    ("approve", "Approve", 3),
+    ("change", "Edit", 1),
+    ("nodeadline", "No deadline", 2),
+    ("drop", "Not a task", 2),
+)
+DEADLINE_NAME = "Deadline"
+EVIDENCE_NAME = "Evidence"
+NO_PROPOSAL_TEXT = "No deadline proposed."
+NO_DEADLINE_TEXT = "No deadline"
+EVIDENCE_EXPIRED = "The evidence has expired."
+DATE_FORMAT = "%A %Y-%m-%d"
+TIME_FORMAT = " at %H:%M"
+APPROVAL_TEXT = {
+    "approve": "Approved",
+    "change": "Approved with your changes",
+    "nodeadline": "Approved without a deadline",
+    "drop": "Not a task",
+}
+
+TASK_FORM_ACTION = "task"
+TASK_FORM_TITLE = "Edit task"
+DEADLINE_LABEL = "Deadline (empty for none)"
+DEADLINE_INPUT_ID = "deadline"
+DEADLINE_LIMIT = 100
+BAD_DEADLINE_TEXT = "Couldn't read that deadline. Try 'Nov 20 at 5 pm', 'Friday' or '2026-11-20'."

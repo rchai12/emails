@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, time
 import httpx
 import pytest
 
-from mailroom.checkpoint import answered_message
+from mailroom.checkpoint import answered_message, checkpoint2_message
 from mailroom.config import Settings, get_settings
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.extractor import Deadline, Extraction
@@ -245,7 +245,7 @@ def test_yes_records_the_title_and_updates_the_card(store: Store, settings: Sett
     assert outcome == "answered"
     assert reply == {
         "type": 7,
-        "data": answered_message(RECORD, VERDICT, ITEM, "yes", "Pay the November bill"),
+        "data": checkpoint2_message(RECORD, VERDICT, ITEM, "Pay the November bill"),
     }
     assert store.answer(ITEM) == Answer(
         item_id=ITEM,
@@ -316,7 +316,7 @@ def test_a_submitted_title_is_recorded_and_updates_the_card(
     assert outcome == "answered"
     assert reply == {
         "type": 7,
-        "data": answered_message(RECORD, VERDICT, ITEM, "edit", "Pay the bill online"),
+        "data": checkpoint2_message(RECORD, VERDICT, ITEM, "Pay the bill online"),
     }
     stored = store.answer(ITEM)
     assert stored is not None

@@ -8,7 +8,7 @@ import pytest
 import mailroom.store
 from mailroom.store import Store
 
-AREAS = ("base", "messages", "sync", "senders", "triage", "posts", "alerts")
+AREAS = ("base", "messages", "sync", "senders", "triage", "posts", "alerts", "approvals")
 
 METHODS = {
     "close": "base",
@@ -37,6 +37,8 @@ METHODS = {
     "queue_alert": "alerts",
     "pending_alerts": "alerts",
     "mark_alert_posted": "alerts",
+    "record_approval": "approvals",
+    "approval": "approvals",
 }
 
 NAMES = {
@@ -54,6 +56,7 @@ NAMES = {
     "Answer": "posts",
     "Problem": "alerts",
     "Alert": "alerts",
+    "Approval": "approvals",
 }
 
 

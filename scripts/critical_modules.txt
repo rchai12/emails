@@ -28,3 +28,4 @@ commands.py
 service.py
 alerts.py
 deadlines.py
+store/approvals.py

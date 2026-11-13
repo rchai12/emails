@@ -18,7 +18,7 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Retention | Email text deleted after 24 hours | Keeps as little personal data as possible | Keeping bodies indefinitely |
 | State storage | One local SQLite database, no vector search in v1 | Every lookup is exact; embeddings would leak email text past 24 hours | A database server; a vector store |
 | Database access | Standard library `sqlite3`, plain SQL, numbered migrations | No dependency; every query visible and testable | SQLAlchemy and Alembic |
-| HTTP client | httpx for every outside call (Gmail, Graph, the local model, the tasks app) | One small library; plain REST calls; tests fake it with no network | Google's client library; the standard library |
+| HTTP client | httpx for every outside REST call (Gmail, Graph, the local model, Discord, the tasks app) | One small library; plain REST calls; tests fake it with no network | Google's client library; the standard library |
 | Accounts | One per provider in v1, every secret and bookmark keyed by an account name | A second account later is configuration, not code | A single fixed account |
 | Mail gone before fetch | Skipped: only mail still in the inbox (not spam or trash) when fetched is stored | You've already dealt with it; a deleted message can't block the sync | Triaging anything that was ever in the inbox |
 | Gmail link | `authuser=<address>` picks the account | Opens the right mailbox with several Google accounts signed in | `u/0`, the first signed-in account |
@@ -43,6 +43,8 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Discord message | An embed card, with the email's text inside code blocks and backticks replaced | Nothing in an email can format, link or mention; the card is easy to scan | Plain text lines |
 | Answered card | Updated in place: your answer shown, answer buttons removed | Can't be answered twice; the channel shows what's done | A private confirmation under an unchanged card |
 | Presses from others | Acknowledged with no change | Nothing happens for anyone but you, and they see nothing | A refusal message |
+| Gateway library | `websockets`, with the Gateway protocol written in the service | One small dependency-free library; the protocol is tested against a fake Gateway | discord.py |
+| Gateway failures | Ordinary drops resume with backoff (1 s up to 60 s); fatal closes such as a revoked token stop with the close code | No silent retry loop on a bad token; you're told instead | Retrying every close forever |
 | Discord content | Short local summary, a link (exact email for Gmail and Outlook, inbox for Yahoo) and a Show full text button | Discord stores what is posted, so the body is never posted in the channel | Full body in the message |
 | Full text on request | Private reply only you can see, sent when you tap Show full text | Lets you read the whole email without leaving Discord or keeping it in channel history | A local web page (needs a private connection from your phone); posting it in the channel |
 | Handoff | The email service runs every checkpoint and sends the tasks app API only fully approved tasks | Simpler, and fits combined approval; the tasks app never asks you twice | The tasks app running the deadline checkpoint; direct writes to tasks or calendar |

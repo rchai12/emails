@@ -41,6 +41,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `triage.py` (what reaches you, and in what order; Phase 1g)
 - `checkpoint.py` and `discord_post.py` (what email text Discord shows; each email posted once, never lost; Phase 1h)
 - `interactions.py` (who can answer, what is recorded, what text goes back to Discord; Phase 1i)
+- `gateway.py` (the bot token, where the Gateway connects, and that a fatal close stops; Phase 1j)
 
 ## Commands
 

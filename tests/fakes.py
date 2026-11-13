@@ -3,10 +3,13 @@
 import base64
 import hashlib
 import json
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from keyring.backend import KeyringBackend
 from keyring.compat import properties
+from websockets.exceptions import ConnectionClosedError, ConnectionClosedOK
+from websockets.frames import Close
 
 
 class FakeKeychain(KeyringBackend):
@@ -625,3 +628,179 @@ class FakeDiscord:
                         return "button custom_id"
                     seen.add(custom_id)
         return ""
+
+
+class FakeGateway:
+    """Discord's Gateway in memory, on a simulated clock, behaving as Discord's reference says.
+
+    `connect(url)` opens a `FakeGatewayConnection`; give it to the code as its `connect`, `now` as
+    `clock.now` and `sleep` as its sleep. Time moves only when the code waits: `recv(timeout)`
+    with nothing to deliver, and `sleep(seconds)`. `done` turns true once the time passes `until`
+    seconds.
+
+    Each connection first sends Hello with `heartbeat_interval`. It answers Heartbeat (op 1) with
+    an ACK (op 11). It answers Identify (op 2) with READY, carrying `session_id` and
+    `resume_gateway_url`, or closes 4004 when the token is wrong. It answers Resume (op 6) with
+    RESUMED when the session and `seq` match, else with Invalid Session (op 9, false). After READY
+    or RESUMED it delivers each of `events` once, as (name, data) Dispatches with rising `s`.
+
+    Frames already queued (Hello, an ACK, READY) always go first. `plans` holds one dict per
+    connection, in order, changing that connection:
+      - `refuse`: the connection is refused (`ConnectionRefusedError`).
+      - `no_ack`: heartbeats are not acknowledged.
+      - `then` and `after`: after delivering `after` events (default 0), the server does one
+        thing: `("close", code)`, `("reconnect",)` (op 7), `("invalid", resumable)` (op 9) or
+        `("heartbeat",)` (op 1, asking for a heartbeat now).
+
+    It also checks the client:
+      - every frame is JSON text with `op`
+      - a heartbeat's `d` is null or the last `s` sent (else it closes 4007)
+      - Identify has `token`, `intents` and `properties` with `os`, `browser` and `device`
+      - no more than 120 frames in any 60 seconds (else it closes 4008)
+    `connections` holds each connection; each has `url`, `sent` (time, payload), `closed_with`.
+    """
+
+    def __init__(self, until: float = 300.0) -> None:
+        self.token = "discord-token-test"
+        self.heartbeat_interval = 41250
+        self.session_id = "session-1"
+        self.resume_url = "wss://gateway-us-east1-b.discord.gg"
+        self.events: list[tuple[str, dict]] = []
+        self.plans: list[dict] = []
+        self.connections: list[FakeGatewayConnection] = []
+        self.sleeps: list[float] = []
+        self.until = until
+        self.seq = 0
+        self._start = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+        self._elapsed = timedelta(0)
+
+    def now(self) -> datetime:
+        return self._start + self._elapsed
+
+    def seconds(self) -> float:
+        return self._elapsed.total_seconds()
+
+    @property
+    def done(self) -> bool:
+        return self.seconds() >= self.until
+
+    def advance(self, seconds: float) -> None:
+        self._elapsed += timedelta(seconds=seconds)
+
+    def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.advance(seconds)
+
+    def connect(self, url: str) -> "FakeGatewayConnection":
+        plan = self.plans[len(self.connections)] if len(self.connections) < len(self.plans) else {}
+        connection = FakeGatewayConnection(self, url, plan)
+        self.connections.append(connection)
+        if plan.get("refuse"):
+            raise ConnectionRefusedError("refused")
+        return connection
+
+
+class FakeGatewayConnection:
+    def __init__(self, gateway: FakeGateway, url: str, plan: dict) -> None:
+        self.gateway = gateway
+        self.url = url
+        self.plan = plan
+        self.sent: list[tuple[float, dict]] = []
+        self.closed_with: int | None = None
+        self.close_code: int | None = None
+        self._outbox: list[dict] = [
+            {"op": 10, "d": {"heartbeat_interval": gateway.heartbeat_interval}}
+        ]
+        self._delivered = 0
+        self._ready = False
+        self._acted = False
+
+    def _dispatch(self, name: str, data: dict) -> dict:
+        self.gateway.seq += 1
+        return {"op": 0, "t": name, "s": self.gateway.seq, "d": data}
+
+    def _server_close(self, code: int) -> None:
+        self.close_code = code
+        raise ConnectionClosedError(Close(code, ""), None)
+
+    def recv(self, timeout: float | None = None) -> str:
+        if self.closed_with is not None:
+            raise ConnectionClosedOK(None, Close(self.closed_with, ""))
+        if self.close_code is not None:
+            self._server_close(self.close_code)
+        if self._outbox:
+            return json.dumps(self._outbox.pop(0))
+        then = self.plan.get("then")
+        if (
+            then
+            and not self._acted
+            and self._ready
+            and self._delivered >= self.plan.get("after", 0)
+        ):
+            self._acted = True
+            if then[0] == "close":
+                self._server_close(then[1])
+            if then[0] == "reconnect":
+                return json.dumps({"op": 7, "d": None})
+            if then[0] == "invalid":
+                return json.dumps({"op": 9, "d": then[1]})
+            return json.dumps({"op": 1, "d": None})
+        if self._ready and self.gateway.events:
+            name, data = self.gateway.events.pop(0)
+            self._delivered += 1
+            return json.dumps(self._dispatch(name, data))
+        if timeout is None:
+            raise AssertionError("recv without a timeout would block forever")
+        self.gateway.advance(max(timeout, 0.0))
+        raise TimeoutError
+
+    def send(self, message: str) -> None:
+        if self.closed_with is not None or self.close_code is not None:
+            raise ConnectionClosedOK(None, Close(self.closed_with or 1000, ""))
+        payload = json.loads(message)
+        now = self.gateway.seconds()
+        self.sent.append((now, payload))
+        recent = [at for at, _ in self.sent if at > now - 60]
+        if len(recent) > 120 or "op" not in payload:
+            self.close_code = 4008 if len(recent) > 120 else 4002
+            return
+        op, data = payload["op"], payload.get("d")
+        if op == 1:
+            if data not in (None, self.gateway.seq):
+                self.close_code = 4007
+            elif not self.plan.get("no_ack"):
+                self._outbox.append({"op": 11})
+        elif op == 2:
+            properties = data.get("properties", {}) if isinstance(data, dict) else {}
+            if not isinstance(data, dict) or not {"token", "intents", "properties"} <= set(data):
+                self.close_code = 4002
+            elif not {"os", "browser", "device"} <= set(properties):
+                self.close_code = 4002
+            elif data["token"] != self.gateway.token:
+                self.close_code = 4004
+            else:
+                self._ready = True
+                ready = {
+                    "v": 10,
+                    "session_id": self.gateway.session_id,
+                    "resume_gateway_url": self.gateway.resume_url,
+                    "user": {"id": "222222222222222222", "username": "mailroom"},
+                    "guilds": [],
+                }
+                self._outbox.append(self._dispatch("READY", ready))
+        elif op == 6:
+            good = (
+                isinstance(data, dict)
+                and data.get("token") == self.gateway.token
+                and data.get("session_id") == self.gateway.session_id
+                and data.get("seq") == self.gateway.seq
+            )
+            if good:
+                self._ready = True
+                self._outbox.append(self._dispatch("RESUMED", {}))
+            else:
+                self._outbox.append({"op": 9, "d": False})
+
+    def close(self, code: int = 1000, reason: str = "") -> None:
+        if self.closed_with is None:
+            self.closed_with = code

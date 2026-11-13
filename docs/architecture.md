@@ -22,7 +22,7 @@ flowchart LR
 | Provider adapters | Poll one provider each and turn its messages into normalized records. See [Ingestion](ingestion.md). |
 | Database | One local SQLite file holding all service state, including dedup keys. See [Database](#database). |
 | Triage | Rules, then the local extractor, then validation and the notify decision. See [Triage](triage.md). |
-| Discord bot | Posts the approval prompts and handles the buttons. See [Approval flow](approval-flow.md). |
+| Discord bot | Posts the approval prompts over REST, receives button presses over the Gateway (a websocket to `*.discord.gg`), and handles them. See [Approval flow](approval-flow.md). |
 | Tasks app client | Sends fully approved tasks to the tasks app. See [Interfaces](interfaces.md). |
 | MCP server | Read-only tools for the email subagent. See [Interfaces](interfaces.md). |
 | Audit log | Records every state change, what triggered it and the original message ID. |

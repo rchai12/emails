@@ -16,3 +16,4 @@ triage.py
 checkpoint.py
 discord_post.py
 interactions.py
+gateway.py

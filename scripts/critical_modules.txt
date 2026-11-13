@@ -19,3 +19,4 @@ interactions.py
 gateway.py
 commands.py
 service.py
+alerts.py

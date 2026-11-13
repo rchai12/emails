@@ -55,6 +55,7 @@ def test_a_gmail_500_is_reported_and_the_round_goes_on(
         "gmail personal: ok",
         "triage: ok",
         "discord posting: ok",
+        "discord alerts: ok",
     ]
     assert len(world.discord.messages) == 1
 

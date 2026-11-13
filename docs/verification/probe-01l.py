@@ -198,10 +198,11 @@ def rounds_converge() -> object:
             for message_id in delivered:
                 if store.post("gmail", message_id) is None:
                     return f"trial {trial}: {message_id} was never queued"
+            cards = [m for m in discord.messages if m["embeds"]]
             if len({m["nonce"] for m in discord.messages}) != len(discord.messages):
-                return f"trial {trial}: an email was posted twice"
-            if len(discord.messages) != len(delivered):
-                return f"trial {trial}: {len(discord.messages)} posts for {len(delivered)} emails"
+                return f"trial {trial}: a message was posted twice"
+            if len(cards) != len(delivered):
+                return f"trial {trial}: {len(cards)} cards for {len(delivered)} emails"
         problem = line_problem(lines)
         if problem:
             return f"trial {trial}: {problem}"

@@ -67,6 +67,8 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 | answers | Your first answer to each posted email (yes, edit, not a task, mute), with the approved title for yes and edit | Long term; the title is kept like a pending item's task title |
 | senders | Trusted and muted lists, sender scores | Long term |
 | sync_state | Each account's sync bookmark and last successful poll | Long term |
+| problems | Each open problem the service watches (Gmail sign-in, the listener, the model), since when, and whether you were told | Until fixed; no email text |
+| alerts | Alerts waiting to be posted and posted ones, keyed so none repeats | Long term; fixed text only |
 | audit_log | Every state change, what triggered it and the message ID | Long term; no email text |
 
 **No vector search in v1.** Every lookup the service needs is exact: by message ID, thread ID or sender address. Vector embeddings would only help with fuzzy matching, such as spotting that a new email is about the same task as an older one in a different thread. Embeddings are derived from email text and can leak some of it, so they'd also have to be deleted after 24 hours, which removes most of their value. Fuzzy matching is listed as [deferred](roadmap.md#deferred-items).

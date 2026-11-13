@@ -88,6 +88,23 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK ((answer IN ('yes', 'edit')) = (title != ''))
     ) STRICT;
     """,
+    """
+    CREATE TABLE problems (
+        key TEXT PRIMARY KEY,
+        since TEXT NOT NULL,
+        alerted INTEGER NOT NULL CHECK (alerted IN (0, 1))
+    ) STRICT;
+    CREATE TABLE alerts (
+        alert_id TEXT PRIMARY KEY,
+        key TEXT NOT NULL UNIQUE,
+        text TEXT NOT NULL,
+        ping INTEGER NOT NULL CHECK (ping IN (0, 1)),
+        queued_at TEXT NOT NULL,
+        discord_message_id TEXT,
+        posted_at TEXT,
+        CHECK ((discord_message_id IS NULL) = (posted_at IS NULL))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

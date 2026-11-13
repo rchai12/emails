@@ -50,7 +50,7 @@ def test_opening_creates_a_private_database(tmp_path: Path) -> None:
     open_store(get_settings()).close()
     assert mode(tmp_path / "data") == 0o700
     assert mode(database(tmp_path)) == 0o600
-    assert raw_row(tmp_path, "PRAGMA user_version") == (6,)
+    assert raw_row(tmp_path, "PRAGMA user_version") == (7,)
     assert raw_row(tmp_path, "SELECT count(*) FROM messages") == (0,)
 
 
@@ -60,17 +60,17 @@ def test_opening_tightens_an_existing_database(tmp_path: Path) -> None:
     database(tmp_path).chmod(0o644)
     open_store(get_settings()).close()
     assert mode(database(tmp_path)) == 0o600
-    assert raw_row(tmp_path, "PRAGMA user_version") == (6,)
+    assert raw_row(tmp_path, "PRAGMA user_version") == (7,)
 
 
 def test_a_newer_schema_is_refused(tmp_path: Path) -> None:
     (tmp_path / "data").mkdir()
     connection = sqlite3.connect(database(tmp_path))
-    connection.execute("PRAGMA user_version = 7")
+    connection.execute("PRAGMA user_version = 99")
     connection.close()
     with pytest.raises(StoreError) as caught:
         open_store(get_settings())
-    assert str(caught.value) == "unsupported schema version: 7"
+    assert str(caught.value) == "unsupported schema version: 99"
 
 
 def test_a_record_is_stored_and_read_back(monkeypatch: pytest.MonkeyPatch) -> None:

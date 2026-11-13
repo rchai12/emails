@@ -123,6 +123,7 @@ def test_a_round_syncs_triages_and_posts(
         "gmail personal: ok",
         "triage: ok",
         "discord posting: ok",
+        "discord alerts: ok",
     ]
     assert store.untriaged() == ()
     (message,) = world.discord.messages
@@ -149,8 +150,9 @@ def test_one_broken_account_does_not_stop_the_others(
         "gmail personal: ok",
         "triage: ok",
         "discord posting: ok",
+        "discord alerts: ok",
     ]
-    assert len(world.discord.messages) == 1
+    assert len([message for message in world.discord.messages if message["embeds"]]) == 1
 
 
 def test_a_missing_gmail_secret_asks_for_sign_in(
@@ -172,6 +174,7 @@ def test_an_unreachable_model_leaves_mail_for_the_next_round(
         "gmail personal: ok",
         "triage: model unavailable (network)",
         "discord posting: ok",
+        "discord alerts: ok",
     ]
     assert len(world.model.requests) == 1
     assert len(store.untriaged()) == 2
@@ -188,7 +191,7 @@ def test_a_discord_failure_leaves_posts_queued(
     deliver(world.gmail["personal"], 1)
     world.model.replies.append(GOOD)
     world.discord.failures.append(httpx.Response(503, text="busy"))
-    assert world.round(store, settings)[-1] == "discord posting: waiting (503)"
+    assert world.round(store, settings)[-2] == "discord posting: waiting (503)"
     assert len(store.pending_posts()) == 1
     assert world.round(store, settings) == ["discord posting: ok"]
     assert store.pending_posts() == ()
@@ -201,7 +204,7 @@ def test_a_missing_bot_token_is_reported_and_posting_waits(
     deliver(world.gmail["personal"], 1)
     world.model.replies.append(GOOD)
     del fake_keychain.secrets[("mailroom", "discord.bot-token")]
-    assert world.round(store, settings)[-1] == (
+    assert world.round(store, settings)[-2] == (
         "discord posting: secret not found: discord.bot-token"
     )
     assert len(store.pending_posts()) == 1

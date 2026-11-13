@@ -142,3 +142,20 @@ NONE_MUTED = "You have no muted senders."
 LIST_LIMIT = 1800
 MORE_TEXT = "...and {count} more."
 REGISTERED_TEXT = "Registered {count} commands in your server."
+
+# Phase 1m: alerts. Only fixed text and identifiers (account names, error messages that are
+# themselves fixed text); never email text. Action alerts mention the owner.
+ALERT_GMAIL_AUTH = "Gmail sign-in needed for {account}. Run: mailroom gmail-login {account}"
+ALERT_GMAIL_FIXED = "Gmail {account} works again."
+ALERT_GATEWAY = (
+    "The Discord listener stopped: {reason}. Buttons and commands won't answer until the "
+    "service is restarted."
+)
+ALERT_GATEWAY_FIXED = "The Discord listener is running again."
+ALERT_MODEL = (
+    "The local model has been unreachable for 15 minutes. New mail is waiting; nothing is lost."
+)
+ALERT_MODEL_FIXED = "The local model is back. Waiting mail is being triaged."
+ALERT_CATCH_UP = "Gmail {account} caught up after {offline} offline: {found}."
+ALERT_GAP = " It was offline for more than 14 days, so check older mail in Gmail yourself."
+LESS_THAN_AN_HOUR = "less than an hour"

@@ -62,13 +62,15 @@ def handle_interaction(
     triaged = store.triage(post.provider, post.message_id)
     record = stored.record
     verdict = triaged.verdict
-    if kind == 5:
-        return _form_reply(event, store, settings, http, record, verdict, item_id, action)
-    if action == "full":
+    if kind == 3 and action == "full":
         _send(http, event, _private(_full_text(record, stored.text_cleared_at is not None)))
         return "full"
-    if action == "trust":
+    if kind == 3 and action == "trust":
         return _trust(event, store, http, record)
+    if post.card == "combined":
+        return _combined(event, store, settings, http, record, verdict, item_id, action, kind)
+    if kind == 5:
+        return _form_reply(event, store, settings, http, record, verdict, item_id, action)
     found = store.answer(item_id)
     if found is None:
         if action in _SECOND_ACTIONS:
@@ -217,6 +219,100 @@ def _field(data: dict[str, object], custom_id: str) -> str:
         if field.get("custom_id") == custom_id:
             return field["value"].strip()
     return ""
+
+
+def _combined(
+    event: dict[str, object],
+    store: Store,
+    settings: Settings,
+    http: httpx.Client,
+    record: Record,
+    verdict: Verdict,
+    item_id: str,
+    action: str,
+    kind: object,
+) -> str:
+    if store.answer(item_id) is not None:
+        _send(http, event, _private(L.ALREADY_TEXT))
+        return "already"
+    if kind == 5:
+        if action != L.TASK_FORM_ACTION:
+            _send(http, event, {"type": L.DEFERRED_UPDATE})
+            return "ignored"
+        return _combined_submission(event, store, settings, http, record, verdict, item_id)
+    if action in ("yes", "edit", "drop"):
+        _send(http, event, {"type": L.DEFERRED_UPDATE})
+        return "ignored"
+    if action in ("notask", "mute"):
+        return _first_answer(event, store, http, record, verdict, item_id, action)
+    if action == "change" or _proposed(verdict) == "":
+        _send(http, event, _task_form(item_id, _offer_title(record, verdict), verdict.due))
+        return "form"
+    due = verdict.due if action == "approve" else None
+    return _finish_combined(
+        event, store, http, record, verdict, item_id, action, _proposed(verdict), due
+    )
+
+
+def _offer_title(record: Record, verdict: Verdict) -> str:
+    proposed = _proposed(verdict)
+    if proposed != "":
+        return proposed
+    return record.subject[: L.FORM_TITLE_LIMIT]
+
+
+def _combined_submission(
+    event: dict[str, object],
+    store: Store,
+    settings: Settings,
+    http: httpx.Client,
+    record: Record,
+    verdict: Verdict,
+    item_id: str,
+) -> str:
+    title = _accepted_title(_submitted_title(event["data"]))
+    if title is None:
+        _send(http, event, _private(L.BAD_TITLE_TEXT))
+        return "bad-title"
+    due = _due_from_field(event["data"], settings)
+    if due == "bad":
+        _send(http, event, _private(L.BAD_DEADLINE_TEXT))
+        return "bad-deadline"
+    return _finish_combined(event, store, http, record, verdict, item_id, "change", title, due)
+
+
+def _due_from_field(data: dict[str, object], settings: Settings) -> Due | None | str:
+    text = _field(data, L.DEADLINE_INPUT_ID)
+    if text == "":
+        return None
+    found = read_deadline(text, _today(settings))
+    if found is None:
+        return "bad"
+    due_date, due_time = found
+    return Due(date=due_date, time=due_time)
+
+
+def _finish_combined(
+    event: dict[str, object],
+    store: Store,
+    http: httpx.Client,
+    record: Record,
+    verdict: Verdict,
+    item_id: str,
+    outcome: str,
+    title: str,
+    due: Due | None,
+) -> str:
+    if not store.record_combined(item_id, outcome, title, due):
+        _send(http, event, _private(L.ALREADY_TEXT))
+        return "already"
+    recorded = store.approval(item_id)
+    _send(
+        http,
+        event,
+        {"type": L.UPDATE_MESSAGE, "data": approved_message(record, verdict, item_id, recorded)},
+    )
+    return "approved"
 
 
 def _form_reply(
@@ -386,15 +482,10 @@ def _task_submission(
     if title is None:
         _send(http, event, _private(L.BAD_TITLE_TEXT))
         return "bad-title"
-    text = _field(event["data"], L.DEADLINE_INPUT_ID)
-    due = None
-    if text != "":
-        found = read_deadline(text, _today(settings))
-        if found is None:
-            _send(http, event, _private(L.BAD_DEADLINE_TEXT))
-            return "bad-deadline"
-        due_date, due_time = found
-        due = Due(date=due_date, time=due_time)
+    due = _due_from_field(event["data"], settings)
+    if due == "bad":
+        _send(http, event, _private(L.BAD_DEADLINE_TEXT))
+        return "bad-deadline"
     return _decide(event, store, http, record, verdict, item_id, "change", title, due, "approved")
 
 

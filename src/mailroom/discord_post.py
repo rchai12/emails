@@ -3,11 +3,12 @@ from dataclasses import dataclass
 
 import httpx
 
-from mailroom import __version__, keychain
+from mailroom import __version__, clock, keychain
 from mailroom import discord_layout as L
-from mailroom.checkpoint import checkpoint_message
+from mailroom.checkpoint import checkpoint_message, combined_message
 from mailroom.config import Settings
-from mailroom.store import Post, Store
+from mailroom.deadlines import deadline_passed
+from mailroom.store import Post, Store, Verdict
 
 TIMEOUT_SECONDS = 30.0
 
@@ -68,12 +69,28 @@ def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostRe
     def body(post: Post) -> dict[str, object]:
         stored = store.get(post.provider, post.message_id)
         triaged = store.triage(post.provider, post.message_id)
-        return checkpoint_message(stored.record, triaged.verdict, post.item_id)
+        verdict = triaged.verdict
+        chosen = store.choose_card(post.item_id, _wanted(verdict, settings))
+        if chosen == "combined":
+            return combined_message(stored.record, verdict, post.item_id)
+        return checkpoint_message(stored.record, verdict, post.item_id)
 
     def mark(post: Post, message_id: str) -> None:
         store.mark_posted(post.item_id, message_id)
 
     return send_messages(settings, http, store.pending_posts(), body, mark)
+
+
+def _wanted(verdict: Verdict, settings: Settings) -> str:
+    due = verdict.due
+    if (
+        verdict.dated
+        and verdict.extraction is not None
+        and due is not None
+        and not deadline_passed(due.date, due.time, settings.time_zone, clock.now())
+    ):
+        return "combined"
+    return "first"
 
 
 def _message_id(response: httpx.Response) -> str | None:

@@ -181,3 +181,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 2e: Combined card (2026-11-13)
+- Tests: 901 -> 961 (given 58)
+- New public names: `deadlines`: `deadline_passed`; `store`: `choose_card`, `record_combined`; `checkpoint`: `combined_message`
+- Changed files: 9
+- Deviations:
+  - None
+- Follow-ups:
+  - None

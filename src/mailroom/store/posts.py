@@ -14,6 +14,7 @@ class Post:
     queued_at: datetime
     discord_message_id: str | None
     posted_at: datetime | None
+    card: str | None = None
 
 
 @dataclass(frozen=True)
@@ -25,7 +26,7 @@ class Answer:
 
 
 def _read_post(row: tuple) -> Post:
-    item_id, provider, message_id, queued_at, discord_message_id, posted_at = row
+    item_id, provider, message_id, queued_at, discord_message_id, posted_at, card = row
     return Post(
         item_id=item_id,
         provider=provider,
@@ -33,6 +34,7 @@ def _read_post(row: tuple) -> Post:
         queued_at=StoreBase._read_time(queued_at),
         discord_message_id=discord_message_id,
         posted_at=None if posted_at is None else StoreBase._read_time(posted_at),
+        card=card,
     )
 
 
@@ -68,7 +70,7 @@ class PostStore(StoreBase):
     def pending_posts(self) -> tuple[Post, ...]:
         rows = self._connection.execute(
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at
+            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at, card
             FROM posts
             WHERE posted_at IS NULL
             ORDER BY queued_at, rowid
@@ -79,7 +81,7 @@ class PostStore(StoreBase):
     def post(self, provider: str, message_id: str) -> Post | None:
         row = self._connection.execute(
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at
+            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at, card
             FROM posts
             WHERE provider = ? AND message_id = ?
             """,
@@ -105,7 +107,7 @@ class PostStore(StoreBase):
     def post_by_item(self, item_id: str) -> Post | None:
         row = self._connection.execute(
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at
+            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at, card
             FROM posts
             WHERE item_id = ?
             """,
@@ -132,6 +134,23 @@ class PostStore(StoreBase):
                 (item_id, answer, title, answered_at, item_id),
             )
         return cursor.rowcount == 1
+
+    def choose_card(self, item_id: str, card: str) -> str | None:
+        with self._write():
+            self._connection.execute(
+                """
+                UPDATE posts SET card = ?
+                WHERE item_id = ? AND card IS NULL
+                """,
+                (card, item_id),
+            )
+            row = self._connection.execute(
+                "SELECT card FROM posts WHERE item_id = ?",
+                (item_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return row[0]
 
     def answer(self, item_id: str) -> Answer | None:
         row = self._connection.execute(

@@ -206,14 +206,12 @@ def _holds(quote: str, subject: str, body: str) -> bool:
     )
 
 
-def _still_ahead(
-    deadline_date: date, deadline_time: time | None, zone: ZoneInfo, now: datetime
-) -> bool:
+def deadline_passed(day: date, at: time | None, time_zone: str, now: datetime) -> bool:
+    zone = ZoneInfo(time_zone)
     local = now.astimezone(zone)
-    if deadline_time is None:
-        return deadline_date >= local.date()
-    moment = datetime.combine(deadline_date, deadline_time, tzinfo=zone)
-    return moment > local
+    if at is None:
+        return day < local.date()
+    return datetime.combine(day, at, tzinfo=zone) <= local
 
 
 def clearly_dated(record: Record, extraction: Extraction, time_zone: str, now: datetime) -> bool:
@@ -234,4 +232,4 @@ def clearly_dated(record: Record, extraction: Extraction, time_zone: str, now: d
         return False
     if not sent_day <= deadline.date <= sent_day + WINDOW:
         return False
-    return _still_ahead(deadline.date, deadline.time, zone, now)
+    return not deadline_passed(deadline.date, deadline.time, time_zone, now)

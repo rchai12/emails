@@ -52,6 +52,32 @@ class ApprovalStore(StoreBase):
             )
         return cursor.rowcount == 1
 
+    def record_combined(self, item_id: str, outcome: str, title: str, due: Due | None) -> bool:
+        decided_at = self._stamp(clock.now())
+        answer = "edit" if outcome == "change" else "yes"
+        deadline_date, deadline_time = _due_columns(due)
+        with self._write():
+            added = self._connection.execute(
+                """
+                INSERT INTO answers (item_id, answer, title, answered_at)
+                SELECT ?, ?, ?, ?
+                FROM posts
+                WHERE posts.item_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM answers WHERE answers.item_id = posts.item_id
+                  )
+                ON CONFLICT DO NOTHING
+                """,
+                (item_id, answer, title, decided_at, item_id),
+            )
+            if added.rowcount != 1:
+                return False
+            self._connection.execute(
+                _INSERT,
+                (item_id, outcome, title, deadline_date, deadline_time, decided_at, item_id),
+            )
+        return True
+
     def approval(self, item_id: str) -> Approval | None:
         row = self._connection.execute(
             """

@@ -169,6 +169,43 @@ def checkpoint2_message(
     }
 
 
+def combined_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
+    extraction = verdict.extraction
+    fields = [
+        *_identity_fields(record),
+        {"name": L.SUMMARY_NAME, "value": _block(extraction.summary)},
+        {"name": L.TASK_NAME, "value": _block(extraction.title)},
+        {"name": L.DEADLINE_NAME, "value": _deadline_line(verdict.due, L.NO_PROPOSAL_TEXT)},
+        {"name": L.EVIDENCE_NAME, "value": _block(extraction.deadline.quote)},
+    ]
+    first = [
+        _button(action, label, style, item_id) for action, label, style in L.COMBINED_FIRST_ROW
+    ]
+    second = [
+        _button(action, label, style, item_id) for action, label, style in L.COMBINED_SECOND_ROW
+    ]
+    open_email = _open_button(record)
+    if open_email is not None:
+        second.append(open_email)
+    return {
+        "embeds": [
+            {
+                "title": L.COMBINED_TITLE,
+                "color": _colour(verdict),
+                "fields": fields,
+                "footer": {"text": _footer(record, verdict)},
+            }
+        ],
+        "components": [
+            {"type": 1, "components": first},
+            {"type": 1, "components": second},
+        ],
+        "allowed_mentions": {"parse": []},
+        "nonce": item_id[: L.NONCE_LENGTH],
+        "enforce_nonce": True,
+    }
+
+
 def approved_message(
     record: Record, verdict: Verdict, item_id: str, approval: Approval
 ) -> dict[str, object]:

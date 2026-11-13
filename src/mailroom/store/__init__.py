@@ -10,11 +10,12 @@ from mailroom.store.senders import SENDER_MESSAGE, STATUS_MESSAGE
 from mailroom.store.senders import SenderStore as _SenderStore
 from mailroom.store.sync import SyncState
 from mailroom.store.sync import SyncStore as _SyncStore
-from mailroom.store.triage import StoredTriage, Verdict
+from mailroom.store.triage import Due, StoredTriage, Verdict
 from mailroom.store.triage import TriageStore as _TriageStore
 
 __all__ = [
     "DB_FILENAME",
+    "Due",
     "SCHEMA_MESSAGE",
     "SENDER_MESSAGE",
     "STATUS_MESSAGE",

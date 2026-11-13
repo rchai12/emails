@@ -3,11 +3,13 @@ from datetime import date, time
 
 import httpx
 
+from mailroom import clock
 from mailroom.config import Settings
+from mailroom.deadlines import clearly_dated
 from mailroom.extractor import Extraction, Rejected, extract
 from mailroom.record import Record
 from mailroom.rules import Screening, screen
-from mailroom.store import Store, Verdict
+from mailroom.store import Due, Store, Verdict
 
 _CONFIDENCE = {"high": 0, "medium": 1, "low": 2}
 
@@ -96,6 +98,14 @@ def triage_message(
         outcome = "extracted"
         extraction = result
         reason = ""
+    now = clock.now()
+    due = None
+    dated = False
+    if extraction is not None:
+        deadline = extraction.deadline
+        if deadline is not None:
+            due = Due(date=deadline.date, time=deadline.time)
+        dated = clearly_dated(record, extraction, settings.time_zone, now)
     verdict = Verdict(
         outcome=outcome,
         trusted=screening.trusted,
@@ -104,6 +114,8 @@ def triage_message(
         notify=should_notify(screening, result),
         extraction=extraction,
         reason=reason,
+        dated=dated,
+        due=due,
     )
     store.save_triage(provider, message_id, verdict)
     return verdict

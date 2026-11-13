@@ -163,3 +163,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 2c: Dated at triage (2026-11-13)
+- Tests: 810 -> 832 (given 22)
+- New public names: `store`: `Due`
+- Changed files: 4
+- Deviations:
+  - None
+- Follow-ups:
+  - None

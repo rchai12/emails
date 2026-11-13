@@ -10,9 +10,9 @@ from mailroom.store.base import StoreBase
 _TRIAGE_INSERT = """
 INSERT INTO triage (
     provider, message_id, outcome, reason, trusted, verified, bulk, notify,
-    extraction, decided_at, text_cleared_at
+    extraction, decided_at, text_cleared_at, deadline_date, deadline_time, dated
 )
-SELECT provider, message_id, ?, ?, ?, ?, ?, ?, ?, ?, NULL
+SELECT provider, message_id, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?
 FROM messages
 WHERE provider = ? AND message_id = ? AND text_cleared_at IS NULL
 ON CONFLICT DO NOTHING
@@ -66,6 +66,12 @@ def _load_extraction(text: str) -> Extraction:
 
 
 @dataclass(frozen=True)
+class Due:
+    date: date
+    time: time | None
+
+
+@dataclass(frozen=True)
 class Verdict:
     outcome: Literal["dropped", "extracted", "rejected"]
     trusted: bool
@@ -74,6 +80,16 @@ class Verdict:
     notify: bool
     extraction: Extraction | None = None
     reason: str = ""
+    dated: bool = False
+    due: Due | None = None
+
+
+def _read_due(deadline_date: str | None, deadline_time: str | None) -> Due | None:
+    if deadline_date is None:
+        return None
+    if deadline_time is None:
+        return Due(date=date.fromisoformat(deadline_date), time=None)
+    return Due(date=date.fromisoformat(deadline_date), time=time.fromisoformat(deadline_time))
 
 
 @dataclass(frozen=True)
@@ -86,6 +102,7 @@ class StoredTriage:
 class TriageStore(StoreBase):
     def save_triage(self, provider: str, message_id: str, verdict: Verdict) -> bool:
         decided_at = self._stamp(clock.now())
+        due = verdict.due
         with self._write():
             cursor = self._connection.execute(
                 _TRIAGE_INSERT,
@@ -98,6 +115,9 @@ class TriageStore(StoreBase):
                     1 if verdict.notify else 0,
                     None if verdict.extraction is None else _dump_extraction(verdict.extraction),
                     decided_at,
+                    None if due is None else due.date.isoformat(),
+                    None if due is None or due.time is None else due.time.strftime("%H:%M"),
+                    1 if verdict.dated else 0,
                     provider,
                     message_id,
                 ),
@@ -108,7 +128,7 @@ class TriageStore(StoreBase):
         row = self._connection.execute(
             """
             SELECT outcome, trusted, verified, bulk, notify, extraction, reason,
-                   decided_at, text_cleared_at
+                   decided_at, text_cleared_at, deadline_date, deadline_time, dated
             FROM triage
             WHERE provider = ? AND message_id = ?
             """,
@@ -116,7 +136,20 @@ class TriageStore(StoreBase):
         ).fetchone()
         if row is None:
             return None
-        outcome, trusted, verified, bulk, notify, extraction, reason, decided_at, cleared = row
+        (
+            outcome,
+            trusted,
+            verified,
+            bulk,
+            notify,
+            extraction,
+            reason,
+            decided_at,
+            cleared,
+            deadline_date,
+            deadline_time,
+            dated,
+        ) = row
         return StoredTriage(
             verdict=Verdict(
                 outcome=outcome,
@@ -126,6 +159,8 @@ class TriageStore(StoreBase):
                 notify=bool(notify),
                 extraction=None if extraction is None else _load_extraction(extraction),
                 reason=reason,
+                dated=bool(dated),
+                due=_read_due(deadline_date, deadline_time),
             ),
             decided_at=self._read_time(decided_at),
             text_cleared_at=None if cleared is None else self._read_time(cleared),

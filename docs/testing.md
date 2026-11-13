@@ -32,7 +32,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `config.py` (where the data folder is, and that it is private; Phase 0)
 - `keychain.py` (secrets read only by name, and never echoed; Phase 0)
 - `mime.py` (untrusted email text cleaned, limited, and never a crash; Phase 1a)
-- `store.py` (deduplication, and email text cleared from the file after 24 hours; Phase 1a)
+- `store/` (deduplication, email text cleared from the file after 24 hours, and every write committed or rolled back as a whole; Phase 1a, a package from Phase 2a)
 - `gmail.py` (read-only Gmail calls, secrets never echoed; Phase 1b)
 - `gmail_sync.py` (what reaches the database: inbox only, once each, nothing lost on a failure; Phase 1c)
 - `gmail_login.py` (read-only scope only, secrets never shown, nothing stored on a failed sign-in; Phase 1d)

@@ -5,7 +5,14 @@ reports.py
 config.py
 keychain.py
 mime.py
-store.py
+store/__init__.py
+store/base.py
+store/messages.py
+store/sync.py
+store/senders.py
+store/triage.py
+store/posts.py
+store/alerts.py
 gmail.py
 gmail_sync.py
 gmail_login.py

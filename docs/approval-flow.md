@@ -116,4 +116,6 @@ Trust comes before urgency because urgency is judged from the email's own wordin
 
 ## Unanswered items
 
+Built in stage 6, with digests.
+
 If you do not answer within 30 minutes, the service sends one follow-up, then lists the item as pending. For a digest, the follow-up lists only the emails still unanswered, in the same order. An item stays pending until you answer; nothing is created automatically.

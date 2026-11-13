@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1n done; 1o is specified. The [Phase 1 audit](phase-01-audit.md)'s fixes come next, as 1n and 1o; splitting `store.py` opens stage 2.
+Status: Phases 0 to 1o done; 2a is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -24,10 +24,12 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1k** the `/trust`, `/untrust`, `/trusted`, `/unmute` and `/muted` commands, registered by `mailroom discord-commands`. Done.
    - **1l** `mailroom run`: the poll loop and the Gateway listener as one service, each part failing on its own. Done.
    - **1m** Discord alerts: a credential stopped working, the Gateway stopped, the model unreachable for a while, and the catch-up summary. Done.
-   - **1n** fixes from the [Phase 1 audit](phase-01-audit.md), part 1: ids written `<account>/<provider id>` and the account on the card, and the data folder excluded from Time Machine.
-   - **1o** fixes from the audit, part 2: single-statement inserts for problems and alerts, and one shared Discord send helper for cards and alerts.
+   - **1n** fixes from the [Phase 1 audit](phase-01-audit.md), part 1: ids written `<account>/<provider id>` and the account on the card, and the data folder excluded from Time Machine. Done.
+   - **1o** fixes from the audit, part 2: single-statement inserts for problems and alerts, and one shared Discord send helper for cards and alerts. Done.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
+   Sub-phases (later ones are planned when each is specified):
+   - **2a** `store.py` split into a package with one module per area, `Store`'s API unchanged, and every write committed or rolled back as a whole.
 3. **Send approved tasks to the real tasks app.**
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
 4. **live.com adapter** using the same pipeline.
@@ -35,7 +37,7 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
 5. **Yahoo adapter** over IMAP using the same pipeline.
    Test: identical emails give identical verdicts from all three providers; a poll leaves every message unread and unchanged in Yahoo; a `UIDVALIDITY` change creates no duplicates.
 6. **Hardening.**
-   Test: an email containing instructions ("create 20 tasks") produces at most one junk proposal; an email forging a trusted sender's address is treated as untrusted; an obvious phishing email is flagged and ranked last; a rejected sync bookmark triggers a catch-up with no duplicates and one Discord message; a failed Discord send is retried until it goes through; a flood of emails arrives as ranked digests with none missing, launchd restarts the service after it is killed, the email subagent reports on Discord when the service is unreachable, email text is gone after 24 hours while dedup keys remain, and a revoked token or app password raises an alert.
+   Test: an email containing instructions ("create 20 tasks") produces at most one junk proposal; an email forging a trusted sender's address is treated as untrusted; an obvious phishing email is flagged and ranked last; a rejected sync bookmark triggers a catch-up with no duplicates and one Discord message; a failed Discord send is retried until it goes through; a flood of emails arrives as ranked digests with none missing, an unanswered card gets one follow-up after 30 minutes and is then listed as pending, launchd restarts the service after it is killed, the email subagent reports on Discord when the service is unreachable, email text is gone after 24 hours while dedup keys remain, and a revoked token or app password raises an alert.
 
 ## Deferred items
 

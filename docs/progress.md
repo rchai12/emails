@@ -118,3 +118,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1m: Alerts (2026-11-13)
+- Tests: 607 -> 637 (given 23)
+- New public names: `store`: `Problem`, `Alert`, `problem`, `open_problem`, `mark_alerted`, `close_problem`, `queue_alert`, `pending_alerts`, `mark_alert_posted`; `alerts`: `MODEL_WAIT`, `track`, `notice`, `catch_up_text`, `post_alerts`
+- Changed files: 5
+- Deviations:
+  - None
+- Follow-ups:
+  - None

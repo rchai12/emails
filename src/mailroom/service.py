@@ -2,15 +2,18 @@
 
 import threading
 from collections.abc import Callable, Sequence
+from datetime import timedelta
 
 import httpx
 
-from mailroom import discord_post, extractor, gmail, gmail_sync, triage
+from mailroom import alerts, clock, discord_post, extractor, gmail, gmail_sync, triage
+from mailroom import discord_layout as L
 from mailroom.config import Settings
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.extractor import ModelUnavailable
 from mailroom.gateway import GatewayStopped, run_gateway
-from mailroom.gmail import GmailClient, GmailError
+from mailroom.gmail import GmailAuthError, GmailClient, GmailError
+from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError
 from mailroom.store import Store, open_store
 
@@ -52,18 +55,28 @@ def run_round(
     store.clear_expired_text()
     for client in gmail_clients:
         try:
-            gmail_sync.sync_gmail(client, store)
+            result = gmail_sync.sync_gmail(client, store)
+        except GmailAuthError as error:
+            health.report(f"gmail {client.account}", str(error))
+            _gmail(store, client.account, True)
         except (GmailError, KeychainError) as error:
             health.report(f"gmail {client.account}", str(error))
         else:
             health.report(f"gmail {client.account}", "ok")
+            _gmail(store, client.account, False)
+            _catch_up(store, client.account, result)
+    triaged = 0
     try:
         for provider, message_id in store.untriaged():
             triage.triage_message(store, provider, message_id, settings, model_http)
+            triaged += 1
     except ModelUnavailable as error:
         health.report("triage", str(error))
+        _model(store, True)
     else:
         health.report("triage", "ok")
+        if triaged:
+            _model(store, False)
     try:
         report = discord_post.post_pending(store, settings, discord_http)
     except (DiscordUnavailable, KeychainError) as error:
@@ -73,6 +86,15 @@ def run_round(
             health.report("discord posting", f"waiting ({report.stopped})")
         else:
             health.report("discord posting", "ok")
+    try:
+        report = alerts.post_alerts(store, settings, discord_http)
+    except (DiscordUnavailable, KeychainError) as error:
+        health.report("discord alerts", str(error))
+    else:
+        if report.stopped:
+            health.report("discord alerts", f"waiting ({report.stopped})")
+        else:
+            health.report("discord alerts", "ok")
 
 
 def run_service(
@@ -106,7 +128,11 @@ def run_service(
     )
     thread.start()
     try:
+        first = True
         while not stop.is_set():
+            if not first and thread.is_alive():
+                _gateway(store, False, "")
+            first = False
             run_round(store, settings, gmail_clients, model_http, discord_http, health)
             stop.wait(settings.poll_seconds)
     finally:
@@ -127,12 +153,62 @@ def _listen(
     try:
         gateway(store, settings, http, stop=stop.is_set)
     except (GatewayStopped, DiscordUnavailable, KeychainError) as error:
-        health.report("discord gateway", str(error))
+        state = str(error)
+        health.report("discord gateway", state)
+        _gateway(store, True, state)
     except Exception as error:
-        health.report("discord gateway", f"failed ({type(error).__name__})")
+        state = f"failed ({type(error).__name__})"
+        health.report("discord gateway", state)
+        _gateway(store, True, state)
     finally:
         http.close()
         store.close()
+
+
+def _gmail(store: Store, account: str, failing: bool) -> None:
+    alerts.track(
+        store,
+        f"gmail-auth:{account}",
+        failing,
+        wait=timedelta(0),
+        raised=L.ALERT_GMAIL_AUTH.format(account=account),
+        ping=True,
+        resolved=L.ALERT_GMAIL_FIXED.format(account=account),
+    )
+
+
+def _catch_up(store: Store, account: str, result: SyncResult) -> None:
+    if result.kind == "catch_up" and result.offline_since is not None:
+        offline = result.offline_since
+        alerts.notice(
+            store,
+            f"catch-up:{account}:{offline.isoformat()}",
+            alerts.catch_up_text(account, clock.now() - offline, len(result.stored), result.gap),
+        )
+
+
+def _model(store: Store, failing: bool) -> None:
+    alerts.track(
+        store,
+        "model",
+        failing,
+        wait=alerts.MODEL_WAIT,
+        raised=L.ALERT_MODEL,
+        ping=False,
+        resolved=L.ALERT_MODEL_FIXED,
+    )
+
+
+def _gateway(store: Store, failing: bool, reason: str) -> None:
+    alerts.track(
+        store,
+        "gateway",
+        failing,
+        wait=timedelta(0),
+        raised=L.ALERT_GATEWAY.format(reason=reason),
+        ping=True,
+        resolved=L.ALERT_GATEWAY_FIXED,
+    )
 
 
 def _close(

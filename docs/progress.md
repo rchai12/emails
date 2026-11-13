@@ -145,3 +145,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 2a: Store package (2026-11-13)
+- Tests: 685 -> 730 (given 45)
+- New public names: None
+- Changed files: 3
+- Deviations:
+  - None
+- Follow-ups:
+  - probe-02a.py seed 21 never queues two notified rows while ids.new_id fails after a successful call, so partial stays 0 and the probe does not print FAILURES 0

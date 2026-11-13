@@ -91,3 +91,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 1j: Discord Gateway (2026-11-12)
+- Tests: 490 -> 540 (given 35)
+- New public names: `gateway`: `GATEWAY_URL_MESSAGE`, `gateway_url_allowed`, `open_gateway`, `GatewayStopped`, `run_gateway`
+- Changed files: 3
+- Deviations:
+  - None
+- Follow-ups:
+  - probe-01j.py plans server closes of 4008, then treats that close_code as a client rate limit, so the probe does not print FAILURES 0

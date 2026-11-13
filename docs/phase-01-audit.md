@@ -31,6 +31,10 @@ The code that is built matches the threat model. Four issues should be settled b
 
 `messages` is keyed by provider and message id (`src/mailroom/schema.py`). Gmail ids are unique inside one mailbox. `MAILROOM_GMAIL_ACCOUNTS` already accepts several names. [Decisions](decisions.md) still says one account per provider, and Phase 1l assumed two Gmail accounts never share an id. A second Gmail account can collide with the first.
 
+### A failed write keeps its lock (found while specifying 1o)
+
+After a write fails (for example the `IntegrityError` above), its connection's transaction stays open and holds the write lock. The other connection's next write waits 5 seconds and then fails with `database is locked`. Phase 1o removes the known failing writes. Rolling back on failure (each write inside `with self._connection:`) is left for the `store.py` split that opens stage 2 (owner's decision, Nov 13, 2026).
+
 ## Documents ahead of the code
 
 [Architecture](architecture.md) lists `threads`, `audit_log`, and sender scores in the schema table. The sentence above that table says each table arrives with the phase that needs it. Schema version 7 has `messages`, `sync_state`, `senders` (address and status only), `triage`, `posts`, `answers`, `problems`, and `alerts`. [Open questions](open-questions.md) still has the sender score undecided.

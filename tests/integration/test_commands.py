@@ -30,8 +30,9 @@ def store() -> Iterator[Store]:
 
 def use(store: Store, settings: Settings, event: dict, discord: FakeDiscord) -> tuple[str, object]:
     http = httpx.Client(transport=httpx.MockTransport(discord.handler))
+    before = len(discord.callbacks)
     outcome = handle_interaction(event, store, settings, http)
-    replies = [body for _, body in discord.callbacks]
+    replies = [body for _, body in discord.callbacks[before:]]
     assert len(replies) <= 1
     return outcome, replies[0] if replies else None
 

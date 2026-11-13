@@ -23,7 +23,9 @@ def handle_interaction(
         raise DiscordUnavailable("not configured") from None
     kind = event["type"]
     if kind == 2:
-        return _slash(event, store, settings, http)
+        answered = _slash(event, store, settings, http)
+        if answered is not None:
+            return answered
     if kind not in (3, 5):
         return "ignored"
     action, item_id = _button(event)
@@ -76,9 +78,12 @@ def handle_interaction(
     return "answered"
 
 
-def _slash(event: dict[str, object], store: Store, settings: Settings, http: httpx.Client) -> str:
-    if event["data"]["name"] not in _COMMAND_NAMES:
-        return "ignored"
+def _slash(
+    event: dict[str, object], store: Store, settings: Settings, http: httpx.Client
+) -> str | None:
+    name = event["data"].get("name")
+    if name not in _COMMAND_NAMES:
+        return None
     if (
         _presser(event) != settings.discord_owner_id
         or event.get("channel_id") != settings.discord_channel_id

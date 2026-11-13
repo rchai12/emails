@@ -100,3 +100,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - probe-01j.py plans server closes of 4008, then treats that close_code as a client rate limit, so the probe does not print FAILURES 0
+
+## Phase 1k: Discord commands (2026-11-12)
+- Tests: 540 -> 580 (given 33)
+- New public names: `config`: `DISCORD_GUILD_MESSAGE`, `discord_guild_id`; `commands`: `register_commands`, `handle_command`; `cli`: `discord_commands`
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

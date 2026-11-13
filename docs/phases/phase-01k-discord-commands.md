@@ -171,3 +171,14 @@ git grep --untracked -n -E 'print\(|logging|logger|warnings\.warn' -- src ':!src
 git grep --untracked -n -E 'datetime\.now|datetime\.utcnow|date\.today|time\.time\(|uuid|from mailroom\.(clock|ids) import' -- src ':!src/mailroom/clock.py' ':!src/mailroom/ids.py'
 git grep --untracked -n -E 'pragma: no cover|noqa' -- src/mailroom/commands.py src/mailroom/interactions.py src/mailroom/config.py src/mailroom/cli.py
 ```
+
+## Corrections
+
+From the first review (`docs/reviews/phase-01k-discord-commands.md`, FAIL).
+
+- **A given test was wrong.** The `use` helper in `tests/integration/test_commands.py` counted every reply the fake had recorded, so the second `use` in `test_the_lists_are_sorted_in_code_blocks` and `test_empty_lists_say_so` saw two replies and failed. It now counts only the replies made during its own call. The fixed file is committed with this correction; it is still a given file. Nothing else about the phase changes.
+- **Still to do (not the spec's fault):**
+  - Requirement 4.1: a type 2 event with no `data.name` (as in `tests/integration/test_interactions.py::test_a_slash_command_is_left_for_later`) must return `"ignored"` with no request. Read the name without assuming it is there.
+  - Requirement 7: the `## Phase 1k: Discord commands (YYYY-MM-DD)` progress entry.
+
+With the corrected helper, every other given test passes against the current code, and `probe-01k.py` prints `FAILURES 0`.

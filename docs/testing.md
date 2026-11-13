@@ -43,6 +43,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `interactions.py` (who can answer, what is recorded, what text goes back to Discord; Phase 1i)
 - `gateway.py` (the bot token, where the Gateway connects, and that a fatal close stops; Phase 1j)
 - `commands.py` (who is trusted or muted, and what goes back to Discord; Phase 1k)
+- `service.py` (nothing lost when a part fails, nothing private in the log; Phase 1l)
 
 ## Commands
 

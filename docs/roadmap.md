@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1j done. Phase 1k specified (`docs/phases/phase-01k-discord-commands.md`); result pending.
+Status: Phases 0 to 1k done. Phase 1l specified (`docs/phases/phase-01l-service-loop.md`); result pending.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -21,8 +21,9 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **1h** posting checkpoint 1 messages to Discord, retry-safe. Done.
    - **1i** handling button presses: the owner check, Show full text, Trust, the answers and the Edit title form. Done.
    - **1j** the Gateway connection that delivers presses: heartbeats, resume, backoff, a stop on fatal closes. Done.
-   - **1k** the `/trust`, `/untrust`, `/trusted`, `/unmute` and `/muted` commands, registered by `mailroom discord-commands`. Specified.
-   - **1l** the poll loop that runs everything as one service.
+   - **1k** the `/trust`, `/untrust`, `/trusted`, `/unmute` and `/muted` commands, registered by `mailroom discord-commands`. Done.
+   - **1l** `mailroom run`: the poll loop and the Gateway listener as one service, each part failing on its own. Specified.
+   - **1m** Discord alerts: a credential stopped working, the Gateway stopped, the model unreachable for a while, and the catch-up summary.
 2. **Deadline checkpoint and combined approval**, sending approved tasks to a stub tasks app.
    Test: relative dates resolve correctly, each shows its evidence quote, and only emails meeting every clearly-dated condition get combined approval.
 3. **Send approved tasks to the real tasks app.**

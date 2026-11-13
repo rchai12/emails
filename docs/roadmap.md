@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 1m done. The [Phase 1 audit](phase-01-audit.md)'s fixes come next, as 1n and 1o; splitting `store.py` opens stage 2.
+Status: Phases 0 to 1m done; 1n is specified. The [Phase 1 audit](phase-01-audit.md)'s fixes come next, as 1n and 1o; splitting `store.py` opens stage 2.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 

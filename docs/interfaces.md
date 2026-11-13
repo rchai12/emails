@@ -16,7 +16,7 @@ The provider and message ID act as an idempotency key: if the service retries a 
 | deadline evidence | The short quote the deadline came from |
 | confidence | From the extractor |
 | provider | `gmail`, `outlook` or `yahoo` |
-| message ID | The provider's message ID |
+| message ID | The stored message ID, `<account>/<provider id>` |
 | link | Link to the exact message for Gmail and Outlook; link to the Yahoo inbox for Yahoo |
 
 ## MCP tools for the email subagent (read-only)

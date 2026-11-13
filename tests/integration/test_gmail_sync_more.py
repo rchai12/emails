@@ -55,4 +55,4 @@ def test_a_message_the_store_did_not_add_is_omitted(
 
     monkeypatch.setattr(store, "add", decline)
     assert sync_gmail(client_for(gmail), store).stored == ()
-    assert store.get("gmail", "m1") is not None
+    assert store.get("gmail", "personal/m1") is not None

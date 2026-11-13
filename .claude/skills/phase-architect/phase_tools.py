@@ -10,6 +10,7 @@
 
     .venv/bin/python .claude/skills/phase-architect/phase_tools.py context MODULE...
         Print the public outline of each module: signatures, dataclass fields, public constants.
+        MODULE is a file path, `gmail_sync`, or `mailroom.gmail_sync`.
 
     .venv/bin/python .claude/skills/phase-architect/phase_tools.py clone 1h --scratch DIR
         Make (or remake) DIR/fail01h from the repository with the venv linked, and say whether
@@ -106,6 +107,13 @@ def plant_and_search(spec_path: Path, cwd: Path, plant: Path) -> int:
 def signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
     return f"def {node.name}({ast.unparse(node.args)}){returns}"
+
+
+def module_path(name: Path) -> Path:
+    """A file path as given; `gmail_sync` or `mailroom.gmail_sync` as its file in src/mailroom."""
+    if name.suffix == ".py":
+        return name
+    return ROOT / "src" / "mailroom" / (str(name).removeprefix("mailroom.") + ".py")
 
 
 def outline(path: Path) -> list[str]:
@@ -502,7 +510,7 @@ def main() -> int:
         return run_searches(args.spec, args.cwd)
     if args.command == "context":
         for module in args.modules:
-            print("\n".join(outline(module)))
+            print("\n".join(outline(module_path(module))))
         return 0
     if args.command == "clone":
         return make_clone(args.id, args.scratch)

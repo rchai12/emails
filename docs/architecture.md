@@ -38,8 +38,8 @@ Every adapter produces the same record shape, so triage never knows which provid
 | Field | Notes |
 | --- | --- |
 | provider | `gmail`, `outlook` or `yahoo` |
-| message ID | Stable per provider; see [Ingestion](ingestion.md) for how Yahoo's is derived |
-| thread ID | Native for Gmail and Graph; derived from headers for Yahoo |
+| message ID | `<account>/<provider id>` (from Phase 1n), so two mailboxes never collide; see [Ingestion](ingestion.md) for how Yahoo's provider id is derived |
+| thread ID | `<account>/<provider id>` too; native for Gmail and Graph, derived from headers for Yahoo |
 | sender | Lower-case address, or empty if missing or malformed; at most 254 characters |
 | sender name | Display name, at most 100 characters; can look like an address, so never trusted |
 | subject | One line, at most 200 characters |

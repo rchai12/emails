@@ -9,7 +9,7 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 - **Login.** `mailroom gmail-login <account>` opens Google's consent page and receives the answer on a one-request listener on 127.0.0.1 (PKCE, 5-minute limit). The first time, it asks for the OAuth client ID and secret (hidden input); `--new-client` replaces them. Only a token for exactly the read-only scope is stored, and nothing is stored unless the whole sign-in succeeds. It finishes by showing the account's address.
 - **First run.** With no history ID yet, the service reads the last 3 days of the inbox, then starts the bookmark.
 - **Still in the inbox.** A message is stored only if, when it is fetched, it is still in the inbox and not in spam or trash. Mail you archive or delete within the minute before a poll is skipped, and a deleted message never blocks the sync.
-- **Link.** `https://mail.google.com/mail/?authuser=<address>#all/<message id>`, so the right account opens when several Google accounts are signed in. **Verify before building:** the link opens the exact message in a desktop browser and on the phone.
+- **Link.** `https://mail.google.com/mail/?authuser=<address>#all/<Gmail message id>` (the bare Gmail id, without the account), so the right account opens when several Google accounts are signed in. **Verify before building:** the link opens the exact message in a desktop browser and on the phone.
 - **Verify before building:** Google refresh tokens for apps left in testing mode can expire after about a week, which would quietly stop ingestion. The read-only Gmail scope is one Google classes as restricted, so also check what publishing the app to production requires for a single personal user, and whether that avoids the full verification process.
 
 ## live.com
@@ -36,7 +36,7 @@ Yahoo has no modern mail API, so the adapter uses IMAP over TLS (`imap.mail.yaho
 ## Shared rules
 
 - **No spam folders.** No adapter reads spam: Gmail's Spam label, Outlook's Junk Email folder or Yahoo's Bulk folder. Mail the provider has filtered as spam never reaches triage.
-- **Deduplication.** Every record is keyed by provider and message ID, so a retry or repeated fetch never creates a second proposal.
+- **Deduplication.** Every record is keyed by provider and message ID, written `<account>/<provider id>`, so a retry or repeated fetch never creates a second proposal.
 - **Secrets.** OAuth tokens and the Yahoo app password are stored in the macOS Keychain or a vault, never in prompts or files an agent can read.
 - **Failures.** A revoked or expired credential raises an alert instead of failing quietly.
 

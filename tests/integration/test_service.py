@@ -127,7 +127,7 @@ def test_a_round_syncs_triages_and_posts(
     ]
     assert store.untriaged() == ()
     (message,) = world.discord.messages
-    assert store.post("gmail", "m1").discord_message_id == message["id"]
+    assert store.post("gmail", "personal/m1").discord_message_id == message["id"]
 
 
 def test_status_lines_are_said_only_when_a_part_changes(
@@ -219,7 +219,7 @@ def test_each_round_clears_text_older_than_a_day(
     world.round(store, settings)
     monkeypatch.setattr(clock, "now", lambda: NOW + timedelta(hours=24))
     world.round(store, settings)
-    stored = store.get("gmail", "m1")
+    stored = store.get("gmail", "personal/m1")
     assert stored is not None
     assert stored.text_cleared_at == NOW + timedelta(hours=24)
 

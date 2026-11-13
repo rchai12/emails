@@ -121,12 +121,16 @@ def test_a_first_sync_stores_the_last_three_days_of_inbox_mail(
     deliver(gmail, 3, labels=("SENT",))
     deliver(gmail, 4)
     assert sync(gmail, store) == SyncResult(
-        account="personal", kind="first", stored=("m4", "m2"), offline_since=None, gap=False
+        account="personal",
+        kind="first",
+        stored=("personal/m4", "personal/m2"),
+        offline_since=None,
+        gap=False,
     )
     assert store.sync_state("gmail", "personal") == SyncState(bookmark="1004", synced_at=NOW)
     assert params(gmail, MESSAGES)[0]["q"] == "after:1794128400"
     assert fetched(gmail) == ["m4", "m2"]
-    assert store.get("gmail", "m1") is None
+    assert store.get("gmail", "personal/m1") is None
 
 
 def test_a_first_sync_reads_the_bookmark_before_listing(gmail: FakeGmail, store: Store) -> None:
@@ -141,12 +145,12 @@ def test_the_stored_record_comes_from_gmail_and_the_parser(gmail: FakeGmail, sto
     sync(gmail, store)
     envelope = Envelope(
         provider="gmail",
-        message_id="m1",
-        thread_id="t1",
+        message_id="personal/m1",
+        thread_id="personal/t1",
         received_at=datetime(2026, 11, 10, 8, 0, 0, 123_000, tzinfo=UTC),
         link="https://mail.google.com/mail/?authuser=owner%2Bmail@example.test#all/m1",
     )
-    assert store.get("gmail", "m1").record == parse_message(raw(1), envelope)
+    assert store.get("gmail", "personal/m1").record == parse_message(raw(1), envelope)
 
 
 # Later syncs
@@ -161,7 +165,7 @@ def test_a_later_sync_stores_new_inbox_mail_from_history(
     deliver(gmail, 3, labels=("SENT",))
     moment = later(monkeypatch, 2)
     assert sync(gmail, store) == SyncResult(
-        account="personal", kind="history", stored=("m2",), offline_since=None, gap=False
+        account="personal", kind="history", stored=("personal/m2",), offline_since=None, gap=False
     )
     assert store.sync_state("gmail", "personal") == SyncState(bookmark="1003", synced_at=moment)
     assert params(gmail, "/gmail/v1/users/me/history")[0]["startHistoryId"] == "1001"
@@ -184,7 +188,7 @@ def test_mail_moved_out_of_spam_is_stored(gmail: FakeGmail, store: Store) -> Non
     deliver(gmail, 1, labels=("SPAM",))
     gmail.messages["m1"]["labelIds"] = []
     gmail.add_labels("m1", "INBOX")
-    assert sync(gmail, store).stored == ("m1",)
+    assert sync(gmail, store).stored == ("personal/m1",)
     assert store.sync_state("gmail", "personal").bookmark == "1002"
 
 
@@ -210,8 +214,8 @@ def test_mail_that_left_the_inbox_before_fetch_is_skipped(
     deliver(gmail, 1)
     deliver(gmail, 2)
     gmail.messages["m1"]["labelIds"] = labels
-    assert sync(gmail, store).stored == ("m2",)
-    assert store.get("gmail", "m1") is None
+    assert sync(gmail, store).stored == ("personal/m2",)
+    assert store.get("gmail", "personal/m1") is None
     assert store.sync_state("gmail", "personal").bookmark == "1002"
 
 
@@ -220,7 +224,7 @@ def test_a_message_deleted_before_fetch_is_skipped(gmail: FakeGmail, store: Stor
     deliver(gmail, 1)
     deliver(gmail, 2)
     del gmail.messages["m1"]
-    assert sync(gmail, store).stored == ("m2",)
+    assert sync(gmail, store).stored == ("personal/m2",)
     assert fetched(gmail) == ["m1", "m2"]
     assert store.sync_state("gmail", "personal").bookmark == "1002"
 
@@ -236,9 +240,9 @@ def test_a_message_with_an_unusable_id_is_skipped(
     bookmarked(store, "1000")
     gmail.add_message(message_id, raw(1), thread_id=thread_id, internal_ms=ms(NOW.isoformat()))
     deliver(gmail, 2)
-    assert sync(gmail, store).stored == ("m2",)
+    assert sync(gmail, store).stored == ("personal/m2",)
     assert fetched(gmail) == fetches
-    assert store.get("gmail", message_id) is None
+    assert store.get("gmail", f"personal/{message_id}") is None
     assert store.sync_state("gmail", "personal").bookmark == "1002"
 
 
@@ -265,7 +269,7 @@ def test_an_expired_bookmark_catches_up(
     assert sync(gmail, store) == SyncResult(
         account="personal",
         kind="catch_up",
-        stored=("m1",),
+        stored=("personal/m1",),
         offline_since=state.synced_at,
         gap=gap,
     )
@@ -277,8 +281,8 @@ def test_an_expired_bookmark_catches_up(
 def store_envelope(message_id: str) -> Envelope:
     return Envelope(
         provider="gmail",
-        message_id=message_id,
-        thread_id="t0",
+        message_id=f"personal/{message_id}",
+        thread_id="personal/t0",
         received_at=NOW,
         link=f"https://mail.google.com/mail/?authuser=owner@example.test#all/{message_id}",
     )
@@ -301,9 +305,9 @@ def test_a_failed_sync_keeps_the_bookmark_and_what_it_stored(
     with pytest.raises(GmailUnavailable) as caught:
         sync_gmail(client_for(gmail, failing), store)
     assert str(caught.value) == "gmail unavailable: personal (503)"
-    assert store.get("gmail", "m2") is not None
+    assert store.get("gmail", "personal/m2") is not None
     assert store.sync_state("gmail", "personal") is None
-    assert sync(gmail, store).stored == ("m1",)
+    assert sync(gmail, store).stored == ("personal/m1",)
     assert fetched(gmail) == ["m2", "m1"]
 
 
@@ -322,4 +326,4 @@ def test_an_error_stops_the_sync_and_keeps_the_bookmark(
     with pytest.raises(expected):
         sync(gmail, store)
     assert store.sync_state("gmail", "personal") == state
-    assert store.get("gmail", "m1") is None
+    assert store.get("gmail", "personal/m1") is None

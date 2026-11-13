@@ -1,6 +1,8 @@
 # Open Questions
 
 - [ ] **Sender score.** Every "Not a task" answer is recorded (Phase 1i), but what a lower score changes is not decided yet. Decide once the service has been used for a while.
+- [ ] **Backups and retention.** Email text is overwritten in the live database after 24 hours, but Time Machine keeps earlier copies of the data folder. Excluding the folder from backups keeps the promise; the cost is that after a restore the dedup keys and Gmail bookmarks are gone, so the first run rereads 3 days of inbox and notifies those emails again. Found by the [Phase 1 audit](phase-01-audit.md) (Nov 13, 2026).
+- [ ] **More than one Gmail account.** Mail is keyed by provider and message id, not by account, so a second Gmail account's message with the same id as the first's would be silently skipped. Either limit Gmail to one account for now (matching [Decisions](decisions.md)), or add the account to the keys before real data builds up. Found by the [Phase 1 audit](phase-01-audit.md) (Nov 13, 2026).
 
 ## Resolved
 

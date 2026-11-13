@@ -52,24 +52,24 @@ Every adapter produces the same record shape, so triage never knows which provid
 
 ## Database
 
-All service state lives in one SQLite database (`mailroom.sqlite3` in the data folder): a single local file, with no separate server to run or secure. It's backed up with the rest of the Mac.
+All service state lives in one SQLite database (`mailroom.sqlite3` in the data folder): a single local file, with no separate server to run or secure. Today Time Machine backs it up with the rest of the Mac, so backups keep email text past 24 hours; whether to exclude the data folder is an [open question](open-questions.md).
 
 - **Private.** The file has mode `0o600`, inside the `0o700` data folder.
 - **Cleared text leaves the file.** `secure_delete` is on, so cleared text is overwritten rather than left in free pages, and the default rollback journal is kept, so no write-ahead log holds old text.
-- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it.
+- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it. Schema version 7 has every table below except those marked planned.
 
 | Table | Holds | Kept |
 | --- | --- | --- |
 | messages | Normalized records, including body text | Body text and authentication results cleared 24 hours after fetch; the row stays as a dedup key |
 | triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, and the extractor output (summary, title, deadline, quote, spam reason) | Extractor output cleared with the email's text, 24 hours after fetch; the verdict stays |
-| threads | Thread ID to task ID mapping | Long term; no email text |
+| threads (planned, stage 3) | Thread ID to task ID mapping | Long term; no email text |
 | posts | Each notified email's item id, when it was queued, and its Discord message ID once posted | Long term; no email text |
 | answers | Your first answer to each posted email (yes, edit, not a task, mute), with the approved title for yes and edit | Long term; the title is kept like a pending item's task title |
-| senders | Trusted and muted lists, sender scores | Long term |
+| senders | Trusted and muted lists (sender scores are an [open question](open-questions.md)) | Long term |
 | sync_state | Each account's sync bookmark and last successful poll | Long term |
 | problems | Each open problem the service watches (Gmail sign-in, the listener, the model), since when, and whether you were told | Until fixed; no email text |
 | alerts | Alerts waiting to be posted and posted ones, keyed so none repeats | Long term; fixed text only |
-| audit_log | Every state change, what triggered it and the message ID | Long term; no email text |
+| audit_log (planned, not yet scheduled) | Every state change, what triggered it and the message ID | Long term; no email text |
 
 **No vector search in v1.** Every lookup the service needs is exact: by message ID, thread ID or sender address. Vector embeddings would only help with fuzzy matching, such as spotting that a new email is about the same task as an older one in a different thread. Embeddings are derived from email text and can leak some of it, so they'd also have to be deleted after 24 hours, which removes most of their value. Fuzzy matching is listed as [deferred](roadmap.md#deferred-items).
 

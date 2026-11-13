@@ -1,15 +1,14 @@
 # Review: Phase 1l
 
-- Verdict: FAIL
+- Verdict: PASS
 - Passed: 607
-- Findings: 2
+- Findings: 0
 - Approved deviations: None
-- For the architect: Corrections change the given test, but that file, the spec, and the two skill files are still uncommitted, so G6 and G7 fail; the service itself passed.
+- For the architect: None
 
 ## Findings
 
-G6 | tests/integration/test_service.py:156 | expected no diff from HEAD for the given service tests | found the missing-secret test now expects gmail sign-in needed: personal
-G7 | docs/phases/phase-01l-service-loop.md:179 | expected git status --short to list only the five Scope paths | found the spec, the given service tests, two architect skill files, and the previous review as well as the Scope paths
+None
 
 Parts that needed a repair: none
 
@@ -17,9 +16,11 @@ Built beyond the spec: none
 
 ## Detail
 
-Requirement 7 is met: `grep -c "^## Phase 1l: " docs/progress.md` prints `1`, and the entry is dated 2026-11-12 with tests 580 to 607. `run_round` reports `str(error)`, so a missing Gmail refresh token is `gmail personal: gmail sign-in needed: personal`, which is what the corrected test expects.
+The reviewed code is `git diff 6a0b383 HEAD` (through `170b970`). The diff gates were run against HEAD. `git diff HEAD` of the given files, including `tests/integration/test_service.py`, is empty. The test change inside that range is the Corrections change: a missing Gmail refresh token is reported as `gmail personal: gmail sign-in needed: personal`.
 
-G1 `.venv/bin/python scripts/check.py --first core` exit 0. The tests step is `607 passed` in 2.76s, 0 failed, 0 skipped, no warnings. Last lines:
+`git diff --stat 6a0b383 HEAD` is the five Scope paths, that test change, the Corrections section, this review, and the two skill files as they stood in `170b970`. `git status --short` also lists newer uncommitted edits to those two skill files. They are not in HEAD and were not judged.
+
+G1 `.venv/bin/python scripts/check.py --first core` exit 0. The tests step is `607 passed` in 2.66s, 0 failed, 0 skipped, no warnings. Last lines:
 
 ```
 Sections:
@@ -36,8 +37,8 @@ Summary:
 All checks passed.
 ```
 
-G3, run immediately after that, exit 0, `TOTAL` 100% (252 statements, 34 branches). G2: `22 passed`. G4: `1`. G5, before this report replaced the previous one: `Reports OK.` Q1 through Q9 print nothing. The freeze matches the Phase 1k list, including `websockets==17.3` and no new package. Probe: `oracle self-check: ok`, `every email is posted once despite failures, and the status lines are clean: ok`, `FAILURES 0`.
-
-G6 prints `tests/integration/test_service.py | 6 ++----`. G7 lists ten paths. The Scope paths are `src/mailroom/cli.py`, `src/mailroom/config.py`, `src/mailroom/service.py`, `tests/integration/test_service_more.py`, and `docs/progress.md`. The other five are `docs/phases/phase-01l-service-loop.md`, `tests/integration/test_service.py`, `.claude/skills/phase-architect/SKILL.md`, `.claude/skills/phase-architect/history.md`, and `docs/reviews/phase-01l-service-loop.md`.
+G3, run immediately after that, exit 0, `TOTAL` 100% (252 statements, 34 branches). G2: `22 passed`. G4: `1`. Q1 through Q9 print nothing. The freeze is the Phase 1k list, 35 packages, including `websockets==17.3`. Probe: `oracle self-check: ok`, `every email is posted once despite failures, and the status lines are clean: ok`, `FAILURES 0`.
 
 Spot checks S1 through S8 each failed as designed, then `service.py` was restored (`git diff HEAD` and `git status --short` matched the snapshots). S1 showed the three repeated lines. S2 omitted `gmail personal: ok`. S3 raised `IndexError`. S4 said `discord posting: ok`. S5 left `text_cleared_at` as `None`. S6 said `discord gateway: failed (ProgrammingError)`. S7 called the listener four times. S8 included `$42.00`.
+
+Requirements: the two settings are `tests/unit/test_config_service.py`; a round is `test_a_round_syncs_triages_and_posts`; a missing Gmail secret is `test_a_missing_gmail_secret_asks_for_sign_in`; one broken account is `test_one_broken_account_does_not_stop_the_others`; triage stops for the round in `test_an_unreachable_model_leaves_mail_for_the_next_round`; posting waits in `test_a_discord_failure_leaves_posts_queued`; the listener's own store is `test_the_service_polls_every_interval_and_listens_on_its_own_thread`; a stopped gateway is `test_a_stopped_gateway_is_reported_once_and_polling_goes_on`; an unexpected listener error is `test_an_unexpected_gateway_error_names_only_its_type`; `mailroom run` is `tests/unit/test_cli_run.py`. The extra file asserts an unexpected round error still stops and closes, a Gmail 500, a listener `DiscordUnavailable`, a listener `KeychainError`, and an empty accounts value.

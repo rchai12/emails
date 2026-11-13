@@ -190,3 +190,18 @@ DEADLINE_LABEL = "Deadline (empty for none)"
 DEADLINE_INPUT_ID = "deadline"
 DEADLINE_LIMIT = 100
 BAD_DEADLINE_TEXT = "Couldn't read that deadline. Try 'Nov 20 at 5 pm', 'Friday' or '2026-11-20'."
+
+# Phase 2e: the combined card, posted instead of checkpoint 1 for a clearly dated email. Its
+# buttons reuse checkpoint 2's actions for the decision and checkpoint 1's for closing it.
+COMBINED_TITLE = "Approve this task?"
+COMBINED_FIRST_ROW = (
+    ("full", "Show full text", 2),
+    ("approve", "Approve", 3),
+    ("change", "Edit", 1),
+    ("nodeadline", "No deadline", 2),
+    ("notask", "Not a task", 2),
+)
+COMBINED_SECOND_ROW = (
+    ("mute", "Mute sender", 4),
+    ("trust", "Trust sender", 2),
+)

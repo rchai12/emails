@@ -29,6 +29,7 @@ METHODS = {
     "mark_posted": "posts",
     "post_by_item": "posts",
     "record_answer": "posts",
+    "choose_card": "posts",
     "answer": "posts",
     "problem": "alerts",
     "open_problem": "alerts",
@@ -39,6 +40,7 @@ METHODS = {
     "mark_alert_posted": "alerts",
     "record_approval": "approvals",
     "approval": "approvals",
+    "record_combined": "approvals",
 }
 
 NAMES = {

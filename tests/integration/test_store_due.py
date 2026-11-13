@@ -125,6 +125,6 @@ def test_a_version_7_database_gains_the_columns_with_nothing_proposed(tmp_path: 
     assert found.verdict == Verdict("dropped", False, True, True, False)
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone() == (9,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (10,)
     finally:
         connection.close()

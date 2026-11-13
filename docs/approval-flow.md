@@ -79,7 +79,9 @@ An email counts as clearly dated only when code confirms all of these; the model
 - the deadline is on or after the day the email was sent, within 366 days of it, and not already past (days in your time zone)
 - the email is actionable with a proposed title
 
-The rule is `mailroom.deadlines.clearly_dated` (Phase 2b).
+The rule is `mailroom.deadlines.clearly_dated` (Phase 2b), decided at triage (Phase 2c). The card is chosen once, just before it is first posted (Phase 2e): a clearly dated email whose deadline has passed by then, or whose text was already cleared, gets the ordinary checkpoint 1 card instead. The post remembers which card it got, so a retried send and every press follow the card you actually see.
+
+Approve, Edit and No deadline on the combined card record your Yes and your checkpoint 2 decision together, as if you had answered both cards. If the email text has been cleared before you answer, Approve and No deadline open the Edit form so you can give the title.
 
 | Button | Result |
 | --- | --- |

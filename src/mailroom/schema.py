@@ -143,6 +143,12 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK (outcome NOT IN ('nodeadline', 'drop') OR deadline_date IS NULL)
     ) STRICT;
     """,
+    # 10: which card a post got, chosen once before its first send. NULL: not chosen yet, or a
+    # post from before Phase 2e, which was always checkpoint 1. SQLite checks an added column's
+    # CHECK against existing rows, so it can't require a card for rows already posted.
+    """
+    ALTER TABLE posts ADD COLUMN card TEXT CHECK (card IS NULL OR card IN ('first', 'combined'));
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

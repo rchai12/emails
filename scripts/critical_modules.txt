@@ -32,3 +32,4 @@ store/approvals.py
 store/tasks.py
 tasks_app.py
 outlook.py
+outlook_sync.py

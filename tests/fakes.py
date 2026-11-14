@@ -1057,7 +1057,7 @@ class FakeGraph:
     - a `nextLink` or `deltaLink` it gave, exactly; `expire_deltas()` makes every earlier link
       answer 410 (or 400 `syncStateNotFound` with `expired_code`);
     - `GET /me/messages/<id>` (`conversationId`, `parentFolderId`, `receivedDateTime`, `webLink`)
-      and `GET /me/messages/<id>/$value`; an unknown id is 404 `ErrorItemNotFound`.
+      and `GET /me/messages/<id>/$value`; an unknown or `delete`d id is 404 `ErrorItemNotFound`.
 
     Pages hold `Prefer: odata.maxpagesize` items (default 10). `failures` answers Graph requests
     and `token_failures` the token endpoint, each entry before any check: an exception is
@@ -1078,6 +1078,7 @@ class FakeGraph:
         self.expired_code = ""
         self.messages: dict[str, dict[str, object]] = {}
         self.log: list[dict[str, object]] = []
+        self.gone: set[str] = set()
         self.valid: set[str] = set()
         self.issued: list[str] = []
         self.failures: list[object] = []
@@ -1116,6 +1117,10 @@ class FakeGraph:
 
     def expire_deltas(self) -> None:
         self._oldest = len(self.log) + 1
+
+    def delete(self, message_id: str) -> None:
+        """Delete a message for good: rounds already listed keep it, but fetching it is 404."""
+        self.gone.add(message_id)
 
     def invalidate_tokens(self) -> None:
         self.valid.clear()
@@ -1242,7 +1247,7 @@ class FakeGraph:
     def _message(self, rest: str) -> httpx.Response:
         message_id, _, tail = rest.partition("/")
         message = self.messages.get(message_id)
-        if message is None or tail not in ("", "$value"):
+        if message is None or message_id in self.gone or tail not in ("", "$value"):
             return self._error(404, "ErrorItemNotFound", "The specified object was not found.")
         if tail == "$value":
             return httpx.Response(

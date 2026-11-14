@@ -18,6 +18,7 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 - **Personal accounts only.** The app is registered for personal Microsoft accounts (the `consumers` tenant), which covers live.com, outlook.com and hotmail.com (owner's decision, Nov 13, 2026).
 - **Refresh tokens rotate.** Each refresh returns a new refresh token, which replaces the old one in the Keychain (Phase 4a).
 - **New mail** is found by polling the inbox with delta queries (`changeType=created`), with immutable ids so a message keeps its id when moved. A page link is followed only to `graph.microsoft.com`, so the token never goes anywhere else.
+- **Inbox only, once each** (Phase 4b). A listed message is stored only if it is still in the inbox when fetched. The bookmark is the delta link, saved after a whole round. An expired link catches up as for Gmail. The card's link is Graph's `webLink` when it is on `outlook.live.com`, otherwise the Outlook inbox.
 - **Login** (Phase 4c): Microsoft's consent page in your browser, answered on a one-request listener on 127.0.0.1 with PKCE, as for Gmail.
 
 ## Yahoo

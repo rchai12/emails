@@ -217,3 +217,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4a: Graph client (2026-11-13)
+- Tests: 1090 -> 1142 (given 39)
+- New public names: `outlook`: `TOKEN_URL`, `API_URL`, `SCOPE`, `PAGE_SIZE`, `TIMEOUT_SECONDS`, `TOKEN_MARGIN`, `ACCOUNT_MESSAGE`, `MESSAGE_ID_MESSAGE`, `IMMUTABLE_ID`, `OutlookError`, `OutlookAuthError`, `OutlookUnavailable`, `DeltaExpired`, `MessageGone`, `Profile`, `MessageRef`, `Delta`, `RawMessage`, `OutlookClient`, `open_outlook`
+- Changed files: 2
+- Deviations:
+  - None
+- Follow-ups:
+  - None

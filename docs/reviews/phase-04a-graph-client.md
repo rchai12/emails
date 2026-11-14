@@ -1,23 +1,42 @@
 # Review: Phase 4a
 
-- Verdict: FAIL
-- Passed: 1069
-- Findings: 1
+- Verdict: PASS
+- Passed: 1142
+- Findings: 0
 - Approved deviations: None
-- For the architect: The first-delta test stores day 9 as 2026-11-9, and FakeGraph compares those strings, so that message sorts after 2026-11-10; the client already sends receivedDateTime ge 2026-11-10T09:00:00Z
+- For the architect: None
 
 ## Findings
 
-11 | docs/progress.md:220 | expected a heading ## Phase 4a: Graph client | found the file ends at Phase 3b
+None
 
-Parts that needed a repair: the progress entry
+Parts that needed a repair: none
 
 Built beyond the spec: none
 
 ## Detail
 
-Coder ran: `src/mailroom/outlook.py` exists. `grep -c "^## Phase 4a: " docs/progress.md` prints nothing, so this is FAIL ("the coder did not run"). The baseline given files are committed. `git status --short` lists only `src/mailroom/outlook.py`.
+Judged with `git diff 35b078a HEAD`. That range adds `src/mailroom/outlook.py`. It also contains the architect's zero-padded day in the given delta test, the Corrections section, and the first review. Those are not coder changes. The working tree adds the progress entry and `tests/integration/test_outlook_more.py`, both Scope paths.
 
-G1 `.venv/bin/python scripts/check.py --first core` failed at the core section: `1069 passed, 1 failed, 0 skipped`. The full tests step and critical coverage were not run. Rerun: `.venv/bin/python scripts/check.py --section core`.
+Coder ran: `src/mailroom/outlook.py` exists, and `grep -c "^## Phase 4a: " docs/progress.md` prints `1`. The baseline given files are committed.
 
-`tests/integration/test_outlook.py::test_a_first_round_reads_the_inbox_since_a_moment_page_by_page` returned `AAMk1=`, `AAMk3=` and `AAMk4=`. The one Graph request in that call already has `$filter` `receivedDateTime ge 2026-11-10T09:00:00Z`. The fake stores day 9 as `2026-11-9T08:00:00Z`, and `2026-11-9` is greater than `2026-11-10` as text, so the fake includes that message. That failure is the given test and fake, recorded above for the architect, not a finding.
+G1 `.venv/bin/python scripts/check.py --first core` exit 0. The tests step is `1142 passed` in 6.61s, 0 failed, 0 skipped. Last lines:
+
+```
+Sections:
+  tooling        59 passed    0 failed    0 skipped
+  core         1083 passed    0 failed    0 skipped
+== critical coverage
+
+Summary:
+  lint: passed
+  format: passed
+  tests (core): passed
+  tests: passed
+  critical coverage: passed
+All checks passed.
+```
+
+G2 is `39 passed`. G3, taken from the check.py coverage data before any later pytest, exit 0 with `TOTAL 100%` (226 statements, 66 branches) on `outlook.py`. G4 and the probe: `oracle self-check: ok`; `the client fails only by name and talks only to Microsoft: ok`; `FAILURES 0`. G5 prints `1`. G6 prints `Reports OK.` G7 and G8 print nothing. G9 lists `docs/progress.md` and `tests/integration/test_outlook_more.py`. G10 `.venv/bin/python -m pip list --format=freeze` is the same 35 packages as before this phase. Q1 through Q8 print nothing.
+
+S1 through S7 each failed with the Broken value (`'refresh-token-1'`, `'outlook unavailable: live (400)'`, `OutlookUnavailable` for the missing preference, `OutlookUnavailable` for a `syncStateNotFound` reply, `MessageGone`, a `RawMessage` returned, `1`). `outlook.py` was restored from a copy outside the repository. `git diff HEAD` and `git status --short` match the snapshots taken before the first edit.

@@ -199,6 +199,20 @@ MIGRATIONS: tuple[str, ...] = (
     DROP TABLE answers;
     ALTER TABLE answers_new RENAME TO answers;
     """,
+    # 13: follow-ups the owner added to an existing task, waiting for that task's id in the tasks
+    # app or already sent there. One per email, keyed like a task. Holds no email text.
+    """
+    CREATE TABLE links (
+        item_id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        task_item_id TEXT NOT NULL,
+        queued_at TEXT NOT NULL,
+        sent_at TEXT,
+        UNIQUE (provider, message_id),
+        CHECK (task_item_id != item_id)
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

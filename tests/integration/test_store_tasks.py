@@ -135,6 +135,6 @@ def test_a_version_10_database_gains_an_empty_tasks_table(tmp_path: Path) -> Non
         assert store.pending_tasks() == ()
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone() == (12,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (13,)
     finally:
         connection.close()

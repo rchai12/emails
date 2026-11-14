@@ -46,6 +46,10 @@ METHODS = {
     "pending_tasks": "tasks",
     "mark_task_sent": "tasks",
     "task": "tasks",
+    "queue_linked": "tasks",
+    "pending_links": "tasks",
+    "mark_link_sent": "tasks",
+    "link": "tasks",
 }
 
 NAMES = {
@@ -65,6 +69,7 @@ NAMES = {
     "Alert": "alerts",
     "Approval": "approvals",
     "Task": "tasks",
+    "Link": "tasks",
 }
 
 

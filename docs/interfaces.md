@@ -21,6 +21,17 @@ Until stage 3 connects the real tasks app, the contract is the stub's (Phase 2f)
 
 The evidence quote and the extractor's confidence are not sent (owner's decision, Nov 13, 2026). The quote is email text, and both are cleared 24 hours after fetch. Every field above is kept long term, so a retry always sends the same body.
 
+### Follow-up added to a task
+
+When you press Add to task on a follow-up card (Phase 3a), the service sends `POST <MAILROOM_TASKS_URL>/tasks/<task id>/links` (Phase 3b), keyed by the follow-up's own `Idempotency-Key: <provider>:<message id>`. `<task id>` is the id the app gave the task, which is accepted only when it is ASCII letters, digits, `-` and `_`. The app answers 201 for a new link and 200 when the key is sent again. A link waits until its task has an id.
+
+| Field | Notes |
+| --- | --- |
+| source | Always `email` |
+| provider | The follow-up's provider |
+| message_id | The follow-up's stored message ID |
+| link | Link to the follow-up email |
+
 ## MCP tools for the email subagent (read-only)
 
 Only the dedicated email subagent uses these tools; the master agent and other app subagents do not (see [Architecture](architecture.md#agents)).

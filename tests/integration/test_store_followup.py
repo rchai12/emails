@@ -125,6 +125,6 @@ def test_a_version_11_database_keeps_its_posts_and_answers(tmp_path: Path) -> No
         assert store.record_answer("item-1", "link", "") is False
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone() == (12,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (13,)
     finally:
         connection.close()

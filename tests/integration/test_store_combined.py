@@ -99,6 +99,6 @@ def test_a_version_9_database_gains_the_card_column_unset(tmp_path: Path) -> Non
         assert store.post_by_item("item-1").card is None
     connection = sqlite3.connect(path)
     try:
-        assert connection.execute("PRAGMA user_version").fetchone() == (12,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (13,)
     finally:
         connection.close()

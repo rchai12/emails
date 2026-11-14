@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 2f done; 3a is specified.
+Status: Phases 0 to 3a done; 3b is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -38,8 +38,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
 3. **Follow-ups, and the real tasks app.**
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
    Sub-phases (later ones are planned when each is specified):
-   - **3a** the follow-up card for an email in a thread with an approved item (Add to task, New task, Not a task), chosen once at posting (migration 12).
-   - **3b** Add to task sends a link to the new email on the existing task to the stub tasks app, keyed so a retry never duplicates.
+   - **3a** the follow-up card for an email in a thread with an approved item (Add to task, New task, Not a task), chosen once at posting (migration 12). Done.
+   - **3b** Add to task sends a link to the new email on the existing task to the stub tasks app, keyed so a retry never duplicates, once that task has its id (migration 13).
    - **3c** connecting your own tasks app once it exists, adopting the stub's contract and adding its sign-in.
 4. **live.com adapter** using the same pipeline.
    Test: identical emails give identical verdicts from Gmail and live.com.

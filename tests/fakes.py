@@ -919,21 +919,29 @@ class FakeTasksApp:
     `provider` (gmail, outlook or yahoo), `message_id` and `link` (non-empty strings); anything
     else is 422. A new key makes a task and answers 201 with `{"id": "task-N"}`; the same key with
     the same body answers 200 with the same id and makes nothing; the same key with a different
-    body answers 409. Any other method or path is 404.
+    body answers 409.
+
+    `POST /tasks/<id>/links` adds a follow-up email to the task with that id (404 for an unknown
+    id). It needs the same key header and a JSON body with exactly `source` ("email"), `provider`,
+    `message_id` and `link`. A new key answers 201 with `{"id": "link-N"}`; the same key, task and
+    body answer 200 with the same id; the same key with another task or body answers 409. Any
+    other method or path is 404.
 
     Each entry of `failures` answers one request before any check: an exception is raised, a
     response is returned, and "lost-reply" handles the request and then raises `ReadTimeout`, as
     if the reply were lost. `tasks` maps each key to its id and body; `requests` holds every
-    request.
+    request; `links` maps each link's key to its id, task id and body.
     """
 
     URL = "http://127.0.0.1:8765"
     FIELDS = frozenset({"source", "title", "deadline", "provider", "message_id", "link"})
+    LINK_FIELDS = frozenset({"source", "provider", "message_id", "link"})
 
     def __init__(self) -> None:
         self.failures: list[object] = []
         self.requests: list[httpx.Request] = []
         self.tasks: dict[str, tuple[str, dict]] = {}
+        self.links: dict[str, tuple[str, str, dict]] = {}
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -951,7 +959,9 @@ class FakeTasksApp:
         return response
 
     def _answer(self, request: httpx.Request) -> httpx.Response:
-        if request.method != "POST" or request.url.path != "/tasks":
+        parts = request.url.path.split("/")
+        is_link = len(parts) == 4 and parts[1] == "tasks" and parts[3] == "links"
+        if request.method != "POST" or (request.url.path != "/tasks" and not is_link):
             return httpx.Response(404, json={"error": "not found"})
         key = request.headers.get("idempotency-key", "")
         if not 1 <= len(key) <= 200:
@@ -960,6 +970,8 @@ class FakeTasksApp:
             body = json.loads(request.content)
         except ValueError:
             return httpx.Response(422, json={"error": "invalid task"})
+        if is_link:
+            return self._link(key, parts[2], body)
         if not self._valid(body):
             return httpx.Response(422, json={"error": "invalid task"})
         if key in self.tasks:
@@ -970,6 +982,30 @@ class FakeTasksApp:
         task_id = f"task-{len(self.tasks) + 1}"
         self.tasks[key] = (task_id, body)
         return httpx.Response(201, json={"id": task_id})
+
+    def _link(self, key: str, task_id: str, body: object) -> httpx.Response:
+        if task_id not in {found for found, _ in self.tasks.values()}:
+            return httpx.Response(404, json={"error": "unknown task"})
+        if not self._valid_link(body):
+            return httpx.Response(422, json={"error": "invalid link"})
+        if key in self.links:
+            link_id, first_task, first = self.links[key]
+            if (first_task, first) != (task_id, body):
+                return httpx.Response(409, json={"error": "key reused with another link"})
+            return httpx.Response(200, json={"id": link_id})
+        link_id = f"link-{len(self.links) + 1}"
+        self.links[key] = (link_id, task_id, body)
+        return httpx.Response(201, json={"id": link_id})
+
+    def _valid_link(self, body: object) -> bool:
+        if not isinstance(body, dict) or set(body) != self.LINK_FIELDS:
+            return False
+        strings = (body["message_id"], body["link"])
+        return (
+            body["source"] == "email"
+            and body["provider"] in ("gmail", "outlook", "yahoo")
+            and all(isinstance(value, str) and value for value in strings)
+        )
 
     def _valid(self, body: object) -> bool:
         if not isinstance(body, dict) or set(body) != self.FIELDS:

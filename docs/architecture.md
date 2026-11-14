@@ -56,7 +56,7 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 
 - **Private.** The file has mode `0o600`, inside the `0o700` data folder.
 - **Cleared text leaves the file.** `secure_delete` is on, so cleared text is overwritten rather than left in free pages, and the default rollback journal is kept, so no write-ahead log holds old text.
-- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it. Schema version 12 has every table below except those marked planned. The thread-to-task mapping is not a table of its own: a follow-up's thread is matched to approved items through `approvals`, `posts` and `messages`, all kept long term.
+- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it. Schema version 13 has every table below except those marked planned. The thread-to-task mapping is not a table of its own: a follow-up's thread is matched to approved items through `approvals`, `posts` and `messages`, all kept long term.
 
 | Table | Holds | Kept |
 | --- | --- | --- |
@@ -66,6 +66,7 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 | answers | Your first answer to each posted email (yes, edit, not a task, mute, and from Phase 3a add to task), with the approved title for yes and edit | Long term; the title is kept like a pending item's task title |
 | approvals | Your checkpoint 2 decision (Phase 2d), or the combined card's (Phase 2e): approve, change, no deadline or not a task, with the approved title and deadline | Long term; the title is kept like an answer's |
 | tasks | Each approved task queued for the tasks app (Phase 2f), keyed by provider and message ID, with the app's task id once sent | Long term; no email text |
+| links | Each follow-up you added to a task (Phase 3b), keyed by provider and message ID, with the item it follows and when it was sent | Long term; no email text |
 | senders | Trusted and muted lists (sender scores are an [open question](open-questions.md)) | Long term |
 | sync_state | Each account's sync bookmark and last successful poll | Long term |
 | problems | Each open problem the service watches (Gmail sign-in, the listener, the model), since when, and whether you were told | Until fixed; no email text |

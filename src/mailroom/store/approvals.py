@@ -78,6 +78,27 @@ class ApprovalStore(StoreBase):
             )
         return True
 
+    def approved_in_thread(self, provider: str, thread_id: str) -> Approval | None:
+        row = self._connection.execute(
+            """
+            SELECT approvals.item_id, approvals.outcome, approvals.title,
+                   approvals.deadline_date, approvals.deadline_time, approvals.decided_at
+            FROM approvals
+            JOIN posts ON posts.item_id = approvals.item_id
+            JOIN messages ON messages.provider = posts.provider
+                          AND messages.message_id = posts.message_id
+            WHERE approvals.outcome != 'drop'
+              AND posts.provider = ?
+              AND messages.thread_id = ?
+            ORDER BY approvals.decided_at DESC, approvals.item_id DESC
+            LIMIT 1
+            """,
+            (provider, thread_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return _approval(row)
+
     def approval(self, item_id: str) -> Approval | None:
         row = self._connection.execute(
             """
@@ -89,11 +110,15 @@ class ApprovalStore(StoreBase):
         ).fetchone()
         if row is None:
             return None
-        found_id, outcome, title, deadline_date, deadline_time, decided_at = row
-        return Approval(
-            item_id=found_id,
-            outcome=outcome,
-            title=title,
-            due=_read_due(deadline_date, deadline_time),
-            decided_at=self._read_time(decided_at),
-        )
+        return _approval(row)
+
+
+def _approval(row: tuple) -> Approval:
+    found_id, outcome, title, deadline_date, deadline_time, decided_at = row
+    return Approval(
+        item_id=found_id,
+        outcome=outcome,
+        title=title,
+        due=_read_due(deadline_date, deadline_time),
+        decided_at=StoreBase._read_time(decided_at),
+    )

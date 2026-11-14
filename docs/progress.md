@@ -199,3 +199,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 3a: Follow-up card (2026-11-13)
+- Tests: 1010 -> 1051 (given 41)
+- New public names: `store`: `approved_in_thread`; `checkpoint`: `followup_message`
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

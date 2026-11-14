@@ -67,17 +67,20 @@ def _deadline_line(due: Due | None, missing: str) -> str:
     return shown
 
 
-def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
+def _summary(verdict: Verdict) -> str:
     extraction = verdict.extraction
     if extraction is not None:
-        summary = _block(extraction.summary)
-    elif verdict.outcome == "rejected":
-        summary = L.UNREAD_TEXT.replace("{reason}", verdict.reason)
-    else:
-        summary = L.EXPIRED_TEXT
+        return _block(extraction.summary)
+    if verdict.outcome == "rejected":
+        return L.UNREAD_TEXT.replace("{reason}", verdict.reason)
+    return L.EXPIRED_TEXT
+
+
+def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[str, object]:
+    extraction = verdict.extraction
     fields: list[dict[str, str]] = [
         *_identity_fields(record),
-        {"name": L.SUMMARY_NAME, "value": summary},
+        {"name": L.SUMMARY_NAME, "value": _summary(verdict)},
     ]
     if extraction is not None and extraction.title:
         fields.append({"name": L.TASK_NAME, "value": _block(extraction.title)})
@@ -110,10 +113,57 @@ def checkpoint_message(record: Record, verdict: Verdict, item_id: str) -> dict[s
     }
 
 
-def answered_message(
-    record: Record, verdict: Verdict, item_id: str, answer: str, title: str
+def followup_message(
+    record: Record, verdict: Verdict, item_id: str, task_title: str
 ) -> dict[str, object]:
-    card = checkpoint_message(record, verdict, item_id)
+    fields: list[dict[str, str]] = [
+        *_identity_fields(record),
+        {"name": L.SUMMARY_NAME, "value": _summary(verdict)},
+        {"name": L.FOLLOWUP_TASK_NAME, "value": _block(task_title)},
+    ]
+    extraction = verdict.extraction
+    if extraction is not None and extraction.suspicious:
+        fields.append({"name": L.WARNING_NAME, "value": _block(extraction.suspicion_reason)})
+    first = [
+        _button(action, label, style, item_id) for action, label, style in L.FOLLOWUP_FIRST_ROW
+    ]
+    second = [
+        _button(action, label, style, item_id) for action, label, style in L.FOLLOWUP_SECOND_ROW
+    ]
+    open_email = _open_button(record)
+    if open_email is not None:
+        second.append(open_email)
+    return {
+        "embeds": [
+            {
+                "title": L.FOLLOWUP_TITLE,
+                "color": _colour(verdict),
+                "fields": fields,
+                "footer": {"text": _footer(record, verdict)},
+            }
+        ],
+        "components": [
+            {"type": 1, "components": first},
+            {"type": 1, "components": second},
+        ],
+        "allowed_mentions": {"parse": []},
+        "nonce": item_id[: L.NONCE_LENGTH],
+        "enforce_nonce": True,
+    }
+
+
+def answered_message(
+    record: Record,
+    verdict: Verdict,
+    item_id: str,
+    answer: str,
+    title: str,
+    task_title: str = "",
+) -> dict[str, object]:
+    if task_title:
+        card = followup_message(record, verdict, item_id, task_title)
+    else:
+        card = checkpoint_message(record, verdict, item_id)
     embed = card["embeds"][0]
     shown = L.ANSWER_TEXT[answer]
     if answer in ("yes", "edit"):

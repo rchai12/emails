@@ -12,11 +12,12 @@ from mailroom.config import Settings
 from mailroom.deadlines import read_deadline
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.record import Record
-from mailroom.store import Answer, Due, Store, Verdict
+from mailroom.store import Answer, Due, Post, Store, Verdict
 
 _PRESS_ACTIONS = frozenset(
     {
         "full",
+        "link",
         "yes",
         "edit",
         "notask",
@@ -67,16 +68,21 @@ def handle_interaction(
         return "full"
     if kind == 3 and action == "trust":
         return _trust(event, store, http, record)
+    if action == "link":
+        return _link(event, store, http, record, verdict, post, item_id)
     if post.card == "combined":
         return _combined(event, store, settings, http, record, verdict, item_id, action, kind)
     if kind == 5:
         return _form_reply(event, store, settings, http, record, verdict, item_id, action)
     found = store.answer(item_id)
     if found is None:
-        if action in _SECOND_ACTIONS:
+        if action in _SECOND_ACTIONS or (post.card == "followup" and action == "edit"):
             _send(http, event, {"type": L.DEFERRED_UPDATE})
             return "ignored"
-        return _first_answer(event, store, http, record, verdict, item_id, action)
+        task_title = ""
+        if post.card == "followup" and action in ("notask", "mute"):
+            task_title = store.approval(post.follows).title
+        return _first_answer(event, store, http, record, verdict, item_id, action, task_title)
     if found.answer in ("yes", "edit") and store.approval(item_id) is None:
         return _second_answer(event, store, http, record, verdict, item_id, action, found)
     _send(http, event, _private(L.ALREADY_TEXT))
@@ -337,6 +343,34 @@ def _form_reply(
     return _task_submission(event, store, settings, http, record, verdict, item_id)
 
 
+def _link(
+    event: dict[str, object],
+    store: Store,
+    http: httpx.Client,
+    record: Record,
+    verdict: Verdict,
+    post: Post,
+    item_id: str,
+) -> str:
+    if post.card != "followup":
+        _send(http, event, {"type": L.DEFERRED_UPDATE})
+        return "ignored"
+    if store.answer(item_id) is not None:
+        _send(http, event, _private(L.ALREADY_TEXT))
+        return "already"
+    store.record_answer(item_id, "link", "")
+    task_title = store.approval(post.follows).title
+    _send(
+        http,
+        event,
+        {
+            "type": L.UPDATE_MESSAGE,
+            "data": answered_message(record, verdict, item_id, "link", "", task_title=task_title),
+        },
+    )
+    return "answered"
+
+
 def _first_answer(
     event: dict[str, object],
     store: Store,
@@ -345,6 +379,7 @@ def _first_answer(
     verdict: Verdict,
     item_id: str,
     action: str,
+    task_title: str = "",
 ) -> str:
     if action == "mute" and record.sender == "":
         _send(http, event, _private(L.NO_SENDER_TEXT))
@@ -358,11 +393,11 @@ def _first_answer(
         reply = checkpoint2_message(record, verdict, item_id, title)
     elif action == "notask":
         store.record_answer(item_id, "notask", "")
-        reply = answered_message(record, verdict, item_id, action, "")
+        reply = answered_message(record, verdict, item_id, action, "", task_title=task_title)
     else:
         store.set_sender_status(record.sender, "muted")
         store.record_answer(item_id, "mute", "")
-        reply = answered_message(record, verdict, item_id, action, "")
+        reply = answered_message(record, verdict, item_id, action, "", task_title=task_title)
     _send(http, event, {"type": L.UPDATE_MESSAGE, "data": reply})
     return "answered"
 

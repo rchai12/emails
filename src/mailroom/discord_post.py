@@ -5,7 +5,7 @@ import httpx
 
 from mailroom import __version__, clock, keychain
 from mailroom import discord_layout as L
-from mailroom.checkpoint import checkpoint_message, combined_message
+from mailroom.checkpoint import checkpoint_message, combined_message, followup_message
 from mailroom.config import Settings
 from mailroom.deadlines import deadline_passed
 from mailroom.store import Post, Store, Verdict
@@ -69,11 +69,21 @@ def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostRe
     def body(post: Post) -> dict[str, object]:
         stored = store.get(post.provider, post.message_id)
         triaged = store.triage(post.provider, post.message_id)
+        record = stored.record
         verdict = triaged.verdict
-        chosen = store.choose_card(post.item_id, _wanted(verdict, settings))
-        if chosen == "combined":
-            return combined_message(stored.record, verdict, post.item_id)
-        return checkpoint_message(stored.record, verdict, post.item_id)
+        target = store.approved_in_thread(post.provider, record.thread_id)
+        if target is None:
+            wanted, follows = _wanted(verdict, settings), None
+        else:
+            wanted, follows = "followup", target.item_id
+        store.choose_card(post.item_id, wanted, follows=follows)
+        posted = store.post_by_item(post.item_id)
+        if posted.card == "followup":
+            task_title = store.approval(posted.follows).title
+            return followup_message(record, verdict, post.item_id, task_title)
+        if posted.card == "combined":
+            return combined_message(record, verdict, post.item_id)
+        return checkpoint_message(record, verdict, post.item_id)
 
     def mark(post: Post, message_id: str) -> None:
         store.mark_posted(post.item_id, message_id)

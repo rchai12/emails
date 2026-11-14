@@ -226,3 +226,13 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4b: Outlook sync (2026-11-13)
+- Tests: 1142 -> 1160 (given 18)
+- New public names: `outlook_sync`: `INBOX_LINK`, `WEB_LINK_PREFIX`, `sync_outlook`
+- Changed files: 4
+- Deviations:
+  - None
+- Follow-ups:
+  - The given sync file collects 17 tests, so its pytest line is 17 passed. One behaviour test covers a store that declines the record.
+  - probe-04b.py ends FAILURES 1. Trial 4 moves AAMk8 into the inbox after expire_deltas, and the catch-up window is by received time, so the message stays unstored. The probe only excuses moves already in moved_in when expire_deltas runs.

@@ -18,7 +18,7 @@ LINK = "https://mail.google.com/mail/?authuser={address}#all/{message_id}"
 @dataclass(frozen=True)
 class SyncResult:
     account: str
-    kind: Literal["first", "history", "catch_up"]
+    kind: Literal["first", "history", "delta", "catch_up"]
     stored: tuple[str, ...]
     offline_since: datetime | None
     gap: bool

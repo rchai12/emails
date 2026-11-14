@@ -41,6 +41,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `triage.py` (what reaches you, and in what order; Phase 1g)
 - `deadlines.py` (which emails count as clearly dated, so skip a checkpoint; Phase 2b)
 - `store/approvals.py` (a checkpoint 2 decision is recorded only after Yes, once; Phase 2d)
+- `store/tasks.py` and `tasks_app.py` (only approved tasks are sent, once each, with no email text; Phase 2f)
 - `checkpoint.py` and `discord_post.py` (what email text Discord shows; each email posted once, never lost; Phase 1h)
 - `interactions.py` (who can answer, what is recorded, what text goes back to Discord; Phase 1i)
 - `gateway.py` (the bot token, where the Gateway connects, and that a fatal close stops; Phase 1j)

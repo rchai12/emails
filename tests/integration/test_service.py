@@ -11,7 +11,7 @@ from mailroom.gateway import GatewayStopped
 from mailroom.gmail import GmailClient
 from mailroom.service import Health, ServiceError, run_round, run_service
 from mailroom.store import Store, open_store
-from tests.fakes import FakeDiscord, FakeGmail, FakeKeychain, FakeOllama
+from tests.fakes import FakeDiscord, FakeGmail, FakeKeychain, FakeOllama, FakeTasksApp
 
 NOW = datetime(2026, 11, 11, 9, 0, tzinfo=UTC)
 GOOD = {
@@ -45,7 +45,7 @@ def deliver(fake: FakeGmail, number: int) -> None:
 
 
 class World:
-    """The fakes for one test: Gmail accounts, the model and Discord, with their clients."""
+    """The fakes for one test: Gmail accounts, the model, Discord, the tasks app, and clients."""
 
     def __init__(self, keychain: FakeKeychain, accounts: tuple[str, ...]) -> None:
         self.gmail = {account: FakeGmail() for account in accounts}
@@ -59,6 +59,7 @@ class World:
         self.model = FakeOllama()
         self.discord = FakeDiscord()
         keychain.secrets[("mailroom", "discord.bot-token")] = self.discord.token
+        self.tasks = FakeTasksApp()
         self.lines: list[str] = []
 
     def client(self, account: str) -> GmailClient:
@@ -71,6 +72,9 @@ class World:
     def discord_http(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self.discord.handler))
 
+    def tasks_http(self) -> httpx.Client:
+        return httpx.Client(transport=httpx.MockTransport(self.tasks.handler))
+
     def round(self, store: Store, settings: Settings) -> list[str]:
         before = len(self.lines)
         run_round(
@@ -79,6 +83,7 @@ class World:
             [self.client(account) for account in self.gmail],
             self.model_http(),
             self.discord_http(),
+            self.tasks_http(),
             self.health,
         )
         return self.lines[before:]
@@ -99,6 +104,7 @@ def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
         ("MAILROOM_TIME_ZONE", "America/New_York"),
         ("MAILROOM_DISCORD_CHANNEL_ID", "111111111111111111"),
         ("MAILROOM_DISCORD_OWNER_ID", "444444444444444444"),
+        ("MAILROOM_TASKS_URL", FakeTasksApp.URL),
     ):
         monkeypatch.setenv(name, value)
     return get_settings()
@@ -122,6 +128,7 @@ def test_a_round_syncs_triages_and_posts(
     assert world.round(store, settings) == [
         "gmail personal: ok",
         "triage: ok",
+        "tasks: ok",
         "discord posting: ok",
         "discord alerts: ok",
     ]
@@ -149,6 +156,7 @@ def test_one_broken_account_does_not_stop_the_others(
         "gmail work: gmail sign-in needed: work",
         "gmail personal: ok",
         "triage: ok",
+        "tasks: ok",
         "discord posting: ok",
         "discord alerts: ok",
     ]
@@ -173,6 +181,7 @@ def test_an_unreachable_model_leaves_mail_for_the_next_round(
     assert world.round(store, settings) == [
         "gmail personal: ok",
         "triage: model unavailable (network)",
+        "tasks: ok",
         "discord posting: ok",
         "discord alerts: ok",
     ]
@@ -250,6 +259,7 @@ def serve(world: World, settings: Settings, stop: threading.Event, gateway) -> N
         open_gmail=world.client,
         open_model_http=world.model_http,
         open_discord_http=world.discord_http,
+        open_tasks_http=world.tasks_http,
         gateway=gateway,
     )
 
@@ -275,10 +285,11 @@ def test_the_service_polls_every_interval_and_listens_on_its_own_thread(
     assert seen["thread"].name == "mailroom-gateway"
     assert not seen["thread"].is_alive()
     assert len(world.discord.messages) == 1
-    assert world.lines[:4] == [
+    assert world.lines[:5] == [
         "discord gateway: running",
         "gmail personal: ok",
         "triage: ok",
+        "tasks: ok",
         "discord posting: ok",
     ]
     assert not any("failed" in line for line in world.lines)

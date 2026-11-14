@@ -23,7 +23,7 @@ flowchart LR
 | Database | One local SQLite file holding all service state, including dedup keys. See [Database](#database). |
 | Triage | Rules, then the local extractor, then validation and the notify decision. See [Triage](triage.md). |
 | Discord bot | Posts the approval prompts over REST, receives button presses over the Gateway (a websocket to `*.discord.gg`), and handles them. See [Approval flow](approval-flow.md). |
-| Tasks app client | Sends fully approved tasks to the tasks app. See [Interfaces](interfaces.md). |
+| Tasks app client | Queues each fully approved task and sends it to the tasks app each round, keyed so a retry never makes a second task. See [Interfaces](interfaces.md). |
 | MCP server | Read-only tools for the email subagent. See [Interfaces](interfaces.md). |
 | Audit log | Records every state change, what triggered it and the original message ID. |
 
@@ -56,15 +56,17 @@ All service state lives in one SQLite database (`mailroom.sqlite3` in the data f
 
 - **Private.** The file has mode `0o600`, inside the `0o700` data folder.
 - **Cleared text leaves the file.** `secure_delete` is on, so cleared text is overwritten rather than left in free pages, and the default rollback journal is kept, so no write-ahead log holds old text.
-- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it. Schema version 7 has every table below except those marked planned.
+- **Schema.** The schema is numbered migrations (`mailroom.schema`), tracked in `PRAGMA user_version`; each table arrives with the phase that needs it. Schema version 11 has every table below except those marked planned.
 
 | Table | Holds | Kept |
 | --- | --- | --- |
 | messages | Normalized records, including body text | Body text and authentication results cleared 24 hours after fetch; the row stays as a dedup key |
 | triage | Each email's verdict: dropped, extracted or rejected (with the field name), the sender flags, whether to notify, the extractor output (summary, title, deadline, quote, spam reason), and (from Phase 2c) the proposed deadline's date and time and whether the email is clearly dated | Extractor output cleared with the email's text, 24 hours after fetch; the verdict, the proposed date and time, and the clearly-dated flag stay |
 | threads (planned, stage 3) | Thread ID to task ID mapping | Long term; no email text |
-| posts | Each notified email's item id, when it was queued, and its Discord message ID once posted | Long term; no email text |
+| posts | Each notified email's item id, when it was queued, its Discord message ID once posted, and (from Phase 2e) which card it got | Long term; no email text |
 | answers | Your first answer to each posted email (yes, edit, not a task, mute), with the approved title for yes and edit | Long term; the title is kept like a pending item's task title |
+| approvals | Your checkpoint 2 decision (Phase 2d), or the combined card's (Phase 2e): approve, change, no deadline or not a task, with the approved title and deadline | Long term; the title is kept like an answer's |
+| tasks | Each approved task queued for the tasks app (Phase 2f), keyed by provider and message ID, with the app's task id once sent | Long term; no email text |
 | senders | Trusted and muted lists (sender scores are an [open question](open-questions.md)) | Long term |
 | sync_state | Each account's sync bookmark and last successful poll | Long term |
 | problems | Each open problem the service watches (Gmail sign-in, the listener, the model), since when, and whether you were told | Until fixed; no email text |

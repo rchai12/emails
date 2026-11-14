@@ -149,6 +149,20 @@ MIGRATIONS: tuple[str, ...] = (
     """
     ALTER TABLE posts ADD COLUMN card TEXT CHECK (card IS NULL OR card IN ('first', 'combined'));
     """,
+    # 11: approved tasks waiting for, or already given, the tasks app's id. One per email, so a
+    # retried send is keyed by provider and message id. Holds no email text.
+    """
+    CREATE TABLE tasks (
+        item_id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        queued_at TEXT NOT NULL,
+        task_id TEXT CHECK (task_id IS NULL OR length(task_id) BETWEEN 1 AND 100),
+        sent_at TEXT,
+        UNIQUE (provider, message_id),
+        CHECK ((task_id IS NULL) = (sent_at IS NULL))
+    ) STRICT;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

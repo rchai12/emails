@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 2d done; 2e is specified.
+Status: Phases 0 to 2e done; 2f is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -33,8 +33,8 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **2b** the clearly-dated rule in code: a deadline reader for the evidence quote and every condition for combined approval, as pure functions. Done.
    - **2c** triage decides and stores whether each email is clearly dated, with the proposed deadline kept past 24 hours (migration 8). Done.
    - **2d** the checkpoint 2 card in place after Yes or Edit title (Approve, Edit with a free-text deadline, No deadline, Not a task), and the decision recorded (migration 9). Done.
-   - **2e** the combined card for clearly dated email, one step instead of two, chosen once at posting (migration 10).
-   - **2f** approved tasks sent to a stub tasks app, keyed so a retry never duplicates.
+   - **2e** the combined card for clearly dated email, one step instead of two, chosen once at posting (migration 10). Done.
+   - **2f** approved tasks queued and sent to a stub tasks app on this Mac, keyed by provider and message ID so a retry never duplicates, with an alert after 15 minutes of failures (migration 11).
 3. **Send approved tasks to the real tasks app.**
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
 4. **live.com adapter** using the same pipeline.

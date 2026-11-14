@@ -8,16 +8,18 @@ Sent only after your final approval: checkpoint 2, or the combined step for a cl
 
 The provider and message ID act as an idempotency key: if the service retries a send, the tasks app recognizes the key and doesn't create a second task.
 
+Until stage 3 connects the real tasks app, the contract is the stub's (Phase 2f): `POST <MAILROOM_TASKS_URL>/tasks` with a JSON body and an `Idempotency-Key: <provider>:<message id>` header. The address must be on this Mac (`127.0.0.1`, `localhost` or `[::1]`). The app answers 201 with `{"id": ...}` for a new task, and 200 with the same id when the key is sent again. Stage 3 adapts this to the real app and adds its sign-in.
+
 | Field | Notes |
 | --- | --- |
 | source | Always `email` |
-| title | As extracted, or as you edited it |
-| deadline | Optional; already confirmed by you |
-| deadline evidence | The short quote the deadline came from |
-| confidence | From the extractor |
+| title | The title you approved |
+| deadline | `null`, or `date` (YYYY-MM-DD), `time` (HH:MM or `null`) and `time_zone` (yours); already confirmed by you |
 | provider | `gmail`, `outlook` or `yahoo` |
-| message ID | The stored message ID, `<account>/<provider id>` |
+| message_id | The stored message ID, `<account>/<provider id>` |
 | link | Link to the exact message for Gmail and Outlook; link to the Yahoo inbox for Yahoo |
+
+The evidence quote and the extractor's confidence are not sent (owner's decision, Nov 13, 2026). The quote is email text, and both are cleared 24 hours after fetch. Every field above is kept long term, so a retry always sends the same body.
 
 ## MCP tools for the email subagent (read-only)
 

@@ -14,7 +14,7 @@ from mailroom.gmail import GmailClient
 from mailroom.keychain import SecretMissing
 from mailroom.service import run_service
 from mailroom.store import Store, open_store
-from tests.fakes import FakeKeychain
+from tests.fakes import FakeKeychain, FakeTasksApp
 from tests.integration.test_service import GOOD, NOW, Rounds, World, deliver, serve
 
 
@@ -27,6 +27,7 @@ def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
         ("MAILROOM_TIME_ZONE", "America/New_York"),
         ("MAILROOM_DISCORD_CHANNEL_ID", "111111111111111111"),
         ("MAILROOM_DISCORD_OWNER_ID", "444444444444444444"),
+        ("MAILROOM_TASKS_URL", FakeTasksApp.URL),
     ):
         monkeypatch.setenv(name, value)
     return get_settings()
@@ -54,6 +55,7 @@ def test_a_gmail_500_is_reported_and_the_round_goes_on(
         "gmail work: gmail unavailable: work (500)",
         "gmail personal: ok",
         "triage: ok",
+        "tasks: ok",
         "discord posting: ok",
         "discord alerts: ok",
     ]

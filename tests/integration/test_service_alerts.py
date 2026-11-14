@@ -11,7 +11,7 @@ from mailroom.gateway import GatewayStopped
 from mailroom.gmail import GmailClient
 from mailroom.service import Health, run_round, run_service
 from mailroom.store import Store, SyncState, open_store
-from tests.fakes import FakeDiscord, FakeGmail, FakeKeychain, FakeOllama
+from tests.fakes import FakeDiscord, FakeGmail, FakeKeychain, FakeOllama, FakeTasksApp
 
 NOW = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
 OWNER = "444444444444444444"
@@ -77,7 +77,13 @@ class World:
     def round(self, store: Store, settings: Settings) -> list[str]:
         before = len(self.lines)
         run_round(
-            store, settings, [self.client()], self.model_http(), self.discord_http(), self.health
+            store,
+            settings,
+            [self.client()],
+            self.model_http(),
+            self.discord_http(),
+            httpx.Client(transport=httpx.MockTransport(FakeTasksApp().handler)),
+            self.health,
         )
         return self.lines[before:]
 

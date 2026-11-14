@@ -50,7 +50,7 @@ def test_opening_creates_a_private_database(tmp_path: Path) -> None:
     open_store(get_settings()).close()
     assert mode(tmp_path / "data") == 0o700
     assert mode(database(tmp_path)) == 0o600
-    assert raw_row(tmp_path, "PRAGMA user_version") == (10,)
+    assert raw_row(tmp_path, "PRAGMA user_version") == (11,)
     assert raw_row(tmp_path, "SELECT count(*) FROM messages") == (0,)
 
 
@@ -60,7 +60,7 @@ def test_opening_tightens_an_existing_database(tmp_path: Path) -> None:
     database(tmp_path).chmod(0o644)
     open_store(get_settings()).close()
     assert mode(database(tmp_path)) == 0o600
-    assert raw_row(tmp_path, "PRAGMA user_version") == (10,)
+    assert raw_row(tmp_path, "PRAGMA user_version") == (11,)
 
 
 def test_a_newer_schema_is_refused(tmp_path: Path) -> None:

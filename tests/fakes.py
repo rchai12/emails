@@ -908,3 +908,97 @@ class FakeGatewayConnection:
     def close(self, code: int = 1000, reason: str = "") -> None:
         if self.closed_with is None:
             self.closed_with = code
+
+
+class FakeTasksApp:
+    """The stub tasks app's `POST /tasks`, the contract Phase 2f defines, for httpx.MockTransport.
+
+    A task needs an `Idempotency-Key` header of 1 to 200 characters (else 400) and a JSON body
+    with exactly `source` ("email"), `title` (1 to 100 characters, one line), `deadline` (null, or
+    exactly `date` as YYYY-MM-DD, `time` as HH:MM or null, and `time_zone`, a non-empty string),
+    `provider` (gmail, outlook or yahoo), `message_id` and `link` (non-empty strings); anything
+    else is 422. A new key makes a task and answers 201 with `{"id": "task-N"}`; the same key with
+    the same body answers 200 with the same id and makes nothing; the same key with a different
+    body answers 409. Any other method or path is 404.
+
+    Each entry of `failures` answers one request before any check: an exception is raised, a
+    response is returned, and "lost-reply" handles the request and then raises `ReadTimeout`, as
+    if the reply were lost. `tasks` maps each key to its id and body; `requests` holds every
+    request.
+    """
+
+    URL = "http://127.0.0.1:8765"
+    FIELDS = frozenset({"source", "title", "deadline", "provider", "message_id", "link"})
+
+    def __init__(self) -> None:
+        self.failures: list[object] = []
+        self.requests: list[httpx.Request] = []
+        self.tasks: dict[str, tuple[str, dict]] = {}
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        lost = False
+        if self.failures:
+            failure = self.failures.pop(0)
+            if isinstance(failure, Exception):
+                raise failure
+            if isinstance(failure, httpx.Response):
+                return failure
+            lost = failure == "lost-reply"
+        response = self._answer(request)
+        if lost:
+            raise httpx.ReadTimeout("lost reply", request=request)
+        return response
+
+    def _answer(self, request: httpx.Request) -> httpx.Response:
+        if request.method != "POST" or request.url.path != "/tasks":
+            return httpx.Response(404, json={"error": "not found"})
+        key = request.headers.get("idempotency-key", "")
+        if not 1 <= len(key) <= 200:
+            return httpx.Response(400, json={"error": "Idempotency-Key required"})
+        try:
+            body = json.loads(request.content)
+        except ValueError:
+            return httpx.Response(422, json={"error": "invalid task"})
+        if not self._valid(body):
+            return httpx.Response(422, json={"error": "invalid task"})
+        if key in self.tasks:
+            task_id, first = self.tasks[key]
+            if first != body:
+                return httpx.Response(409, json={"error": "key reused with another task"})
+            return httpx.Response(200, json={"id": task_id})
+        task_id = f"task-{len(self.tasks) + 1}"
+        self.tasks[key] = (task_id, body)
+        return httpx.Response(201, json={"id": task_id})
+
+    def _valid(self, body: object) -> bool:
+        if not isinstance(body, dict) or set(body) != self.FIELDS:
+            return False
+        title = body["title"]
+        strings = (body["message_id"], body["link"])
+        return (
+            body["source"] == "email"
+            and isinstance(title, str)
+            and 1 <= len(title) <= 100
+            and "\n" not in title
+            and body["provider"] in ("gmail", "outlook", "yahoo")
+            and all(isinstance(value, str) and value for value in strings)
+            and self._valid_deadline(body["deadline"])
+        )
+
+    @staticmethod
+    def _valid_deadline(deadline: object) -> bool:
+        if deadline is None:
+            return True
+        if not isinstance(deadline, dict) or set(deadline) != {"date", "time", "time_zone"}:
+            return False
+        day, at, zone = deadline["date"], deadline["time"], deadline["time_zone"]
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+            if at is not None:
+                datetime.strptime(at, "%H:%M")
+        except (TypeError, ValueError):
+            return False
+        return (
+            len(day) == 10 and (at is None or len(at) == 5) and isinstance(zone, str) and zone != ""
+        )

@@ -156,6 +156,11 @@ ALERT_MODEL = (
     "The local model has been unreachable for 15 minutes. New mail is waiting; nothing is lost."
 )
 ALERT_MODEL_FIXED = "The local model is back. Waiting mail is being triaged."
+ALERT_TASKS = (
+    "Approved tasks have not reached the tasks app for 15 minutes. They stay queued and are "
+    "retried every round."
+)
+ALERT_TASKS_FIXED = "The tasks app works again. Queued tasks are being sent."
 ALERT_CATCH_UP = "Gmail {account} caught up after {offline} offline: {found}."
 ALERT_GAP = " It was offline for more than 14 days, so check older mail in Gmail yourself."
 LESS_THAN_AN_HOUR = "less than an hour"

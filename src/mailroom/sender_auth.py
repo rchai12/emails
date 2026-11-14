@@ -117,7 +117,49 @@ def parse_results(header: str) -> tuple[str, tuple[AuthResult, ...]]:
     return authserv_id, tuple(results)
 
 
+def _method_word(word: str) -> bool:
+    method, separator, result = word.partition("=")
+    return separator != "" and method != "" and result != ""
+
+
+def _leading_result(header: str) -> AuthResult | None:
+    readable = _without_comments(header)
+    if readable is None:
+        return None
+    tokens = readable.split(";", 1)[0].split()
+    if not tokens or not _method_word(tokens[0]):
+        return None
+    method, _, result = tokens[0].partition("=")
+    props = tuple(
+        (token.split("=", 1)[0].lower(), token.split("=", 1)[1])
+        for token in tokens[1:]
+        if "=" in token
+    )
+    return AuthResult(method.lower(), result.lower(), props)
+
+
+def _outlook_verified(record: Record) -> bool:
+    if not record.authentication_results:
+        return False
+    leading = _leading_result(record.authentication_results[0])
+    if leading is None:
+        return False
+    _, rest = parse_results(record.authentication_results[0])
+    results = (leading, *rest)
+    if not any(item.method == "compauth" for item in results):
+        return False
+    domain = _sender_domain(record.sender)
+    if domain is None:
+        return False
+    return _dmarc_passes(results, domain) or (
+        _method_passes(results, "spf", "smtp.mailfrom", domain)
+        and _method_passes(results, "dkim", "header.d", domain)
+    )
+
+
 def verified(record: Record) -> bool:
+    if record.provider == "outlook":
+        return _outlook_verified(record)
     expected = AUTHSERV_IDS.get(record.provider)
     if expected is None or not record.authentication_results:
         return False

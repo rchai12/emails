@@ -6,7 +6,18 @@ from datetime import timedelta
 
 import httpx
 
-from mailroom import alerts, clock, discord_post, extractor, gmail, gmail_sync, tasks_app, triage
+from mailroom import (
+    alerts,
+    clock,
+    discord_post,
+    extractor,
+    gmail,
+    gmail_sync,
+    outlook,
+    outlook_sync,
+    tasks_app,
+    triage,
+)
 from mailroom import discord_layout as L
 from mailroom.config import Settings
 from mailroom.discord_post import DiscordUnavailable, PostReport
@@ -15,11 +26,12 @@ from mailroom.gateway import GatewayStopped, run_gateway
 from mailroom.gmail import GmailAuthError, GmailClient, GmailError
 from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError
+from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError
 from mailroom.store import Store, open_store
 from mailroom.tasks_app import TasksUnavailable
 
+_ACCOUNTS = "MAILROOM_GMAIL_ACCOUNTS or MAILROOM_OUTLOOK_ACCOUNTS"
 _REQUIRED = (
-    ("gmail_accounts", "MAILROOM_GMAIL_ACCOUNTS"),
     ("extractor_model", "MAILROOM_EXTRACTOR_MODEL"),
     ("time_zone", "MAILROOM_TIME_ZONE"),
     ("discord_channel_id", "MAILROOM_DISCORD_CHANNEL_ID"),
@@ -48,25 +60,18 @@ class Health:
 def run_round(
     store: Store,
     settings: Settings,
-    gmail_clients: Sequence[GmailClient],
+    mail_clients: Sequence[GmailClient | OutlookClient],
     model_http: httpx.Client,
     discord_http: httpx.Client,
     tasks_http: httpx.Client,
     health: Health,
 ) -> None:
     store.clear_expired_text()
-    for client in gmail_clients:
-        try:
-            result = gmail_sync.sync_gmail(client, store)
-        except GmailAuthError as error:
-            health.report(f"gmail {client.account}", str(error))
-            _gmail(store, client.account, True)
-        except (GmailError, KeychainError) as error:
-            health.report(f"gmail {client.account}", str(error))
+    for client in mail_clients:
+        if isinstance(client, OutlookClient):
+            _outlook_account(store, client, health)
         else:
-            health.report(f"gmail {client.account}", "ok")
-            _gmail(store, client.account, False)
-            _catch_up(store, client.account, result)
+            _gmail_account(store, client, health)
     triaged = 0
     try:
         for provider, message_id in store.untriaged():
@@ -95,21 +100,28 @@ def run_service(
     say: Callable[[str], None],
     stop: threading.Event,
     open_gmail: Callable[[str], GmailClient] = gmail.open_gmail,
+    open_outlook: Callable[[str], OutlookClient] = outlook.open_outlook,
     open_model_http: Callable[[], httpx.Client] = extractor.open_model_http,
     open_discord_http: Callable[[], httpx.Client] = discord_post.open_discord_http,
     open_tasks_http: Callable[[], httpx.Client] = tasks_app.open_tasks_http,
     gateway: Callable[..., None] = run_gateway,
 ) -> None:
-    missing = [
+    missing = []
+    if settings.gmail_accounts == () and settings.outlook_accounts == ():
+        missing.append(_ACCOUNTS)
+    missing.extend(
         label
         for attr, label in _REQUIRED
         if getattr(settings, attr) == "" or getattr(settings, attr) == ()
-    ]
+    )
     if missing:
         raise ServiceError("not configured: " + ", ".join(missing))
     health = Health(say)
     store = open_store(settings)
-    gmail_clients = [open_gmail(account) for account in settings.gmail_accounts]
+    mail_clients: list[GmailClient | OutlookClient] = [
+        open_gmail(account) for account in settings.gmail_accounts
+    ]
+    mail_clients.extend(open_outlook(account) for account in settings.outlook_accounts)
     model_http = open_model_http()
     discord_http = open_discord_http()
     tasks_http = open_tasks_http()
@@ -127,12 +139,12 @@ def run_service(
             if not first and thread.is_alive():
                 _gateway(store, False, "")
             first = False
-            run_round(store, settings, gmail_clients, model_http, discord_http, tasks_http, health)
+            run_round(store, settings, mail_clients, model_http, discord_http, tasks_http, health)
             stop.wait(settings.poll_seconds)
     finally:
         stop.set()
         thread.join(10)
-        _close(store, gmail_clients, model_http, discord_http, tasks_http)
+        _close(store, mail_clients, model_http, discord_http, tasks_http)
 
 
 def _listen(
@@ -186,6 +198,34 @@ def _tasks(store: Store, report: PostReport | None) -> None:
     )
 
 
+def _gmail_account(store: Store, client: GmailClient, health: Health) -> None:
+    try:
+        result = gmail_sync.sync_gmail(client, store)
+    except GmailAuthError as error:
+        health.report(f"gmail {client.account}", str(error))
+        _gmail(store, client.account, True)
+    except (GmailError, KeychainError) as error:
+        health.report(f"gmail {client.account}", str(error))
+    else:
+        health.report(f"gmail {client.account}", "ok")
+        _gmail(store, client.account, False)
+        _catch_up(store, client.account, result)
+
+
+def _outlook_account(store: Store, client: OutlookClient, health: Health) -> None:
+    try:
+        result = outlook_sync.sync_outlook(client, store)
+    except OutlookAuthError as error:
+        health.report(f"outlook {client.account}", str(error))
+        _outlook(store, client.account, True)
+    except (OutlookError, KeychainError) as error:
+        health.report(f"outlook {client.account}", str(error))
+    else:
+        health.report(f"outlook {client.account}", "ok")
+        _outlook(store, client.account, False)
+        _catch_up(store, client.account, result, "outlook")
+
+
 def _gmail(store: Store, account: str, failing: bool) -> None:
     alerts.track(
         store,
@@ -198,13 +238,31 @@ def _gmail(store: Store, account: str, failing: bool) -> None:
     )
 
 
-def _catch_up(store: Store, account: str, result: SyncResult) -> None:
+def _outlook(store: Store, account: str, failing: bool) -> None:
+    alerts.track(
+        store,
+        f"outlook-auth:{account}",
+        failing,
+        wait=timedelta(0),
+        raised=L.ALERT_OUTLOOK_AUTH.format(account=account),
+        ping=True,
+        resolved=L.ALERT_OUTLOOK_FIXED.format(account=account),
+    )
+
+
+def _catch_up(store: Store, account: str, result: SyncResult, provider: str = "gmail") -> None:
     if result.kind == "catch_up" and result.offline_since is not None:
         offline = result.offline_since
+        if provider == "gmail":
+            key = f"catch-up:{account}:{offline.isoformat()}"
+        else:
+            key = f"catch-up:{provider}:{account}:{offline.isoformat()}"
         alerts.notice(
             store,
-            f"catch-up:{account}:{offline.isoformat()}",
-            alerts.catch_up_text(account, clock.now() - offline, len(result.stored), result.gap),
+            key,
+            alerts.catch_up_text(
+                account, clock.now() - offline, len(result.stored), result.gap, provider
+            ),
         )
 
 
@@ -234,13 +292,13 @@ def _gateway(store: Store, failing: bool, reason: str) -> None:
 
 def _close(
     store: Store,
-    gmail_clients: Sequence[GmailClient],
+    mail_clients: Sequence[GmailClient | OutlookClient],
     model_http: httpx.Client,
     discord_http: httpx.Client,
     tasks_http: httpx.Client,
 ) -> None:
     store.close()
-    for client in gmail_clients:
+    for client in mail_clients:
         client.http.close()
     model_http.close()
     discord_http.close()

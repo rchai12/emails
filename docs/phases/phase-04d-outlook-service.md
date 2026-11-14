@@ -19,6 +19,13 @@ Start: `.venv/bin/python -m pytest --no-cov -q --ignore=tests/unit/test_config_o
   - `test_service.py`'s missing-settings message;
   - the Gmail catch-up tests, because the given `ALERT_CATCH_UP` now has a `{provider}` slot.
 
+## Corrections
+
+- **2026-11-13, after the first review (FAIL).** Two rows of the given `test_microsofts_first_header_decides` expected `False` where Requirement 2's rule ("the same rules as Gmail") gives `True`. The code was right.
+  - **`dmarc-other-domain`.** DMARC passed only for another domain, but SPF and DKIM both passed for the sender's domain, which verifies by Gmail's rule.
+  - **`dkim-other-domain`.** DKIM passed for `other.example.test`, a subdomain, which aligns with `example.test`.
+  Both rows now test what their names say, with an unrelated domain and nothing else passing (`False`). Gmail's unchanged rule gives the same answers on the same results. Against the coder's uncommitted `sender_auth.py`, `config.py`, `alerts.py` and `service.py`, which stay as they are: the 39 given tests pass, the probe prints `FAILURES 0`, and the suite passes 1211. The coder's remaining work is the Acceptance run and the progress entry.
+
 ## Facts
 
 Checked in Microsoft's documentation and against today's code.

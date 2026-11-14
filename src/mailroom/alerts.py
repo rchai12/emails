@@ -39,10 +39,15 @@ def notice(store: Store, key: str, text: str) -> None:
     store.queue_alert(key, text, False)
 
 
-def catch_up_text(account: str, offline: timedelta, count: int, gap: bool) -> str:
-    text = L.ALERT_CATCH_UP.format(account=account, offline=_offline(offline), found=_found(count))
+def catch_up_text(
+    account: str, offline: timedelta, count: int, gap: bool, provider: str = "gmail"
+) -> str:
+    name = L.PROVIDER_NAMES[provider]
+    text = L.ALERT_CATCH_UP.format(
+        provider=name, account=account, offline=_offline(offline), found=_found(count)
+    )
     if gap:
-        text += L.ALERT_GAP
+        text += L.ALERT_GAP.format(provider=name)
     return text
 
 

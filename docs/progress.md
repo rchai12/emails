@@ -245,3 +245,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4d: Outlook in the service (2026-11-13)
+- Tests: 1184 -> 1212 (given 39)
+- New public names: `config`: `OUTLOOK_ACCOUNTS_MESSAGE`, `outlook_accounts`
+- Changed files: 11
+- Deviations:
+  - None
+- Follow-ups:
+  - git status also lists the uncommitted header-row correction, the spec's Corrections section, the architect notes, and the review.

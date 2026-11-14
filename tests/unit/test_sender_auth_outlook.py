@@ -50,13 +50,18 @@ def header(*parts: str) -> str:
         (header(SPF, DKIM, DMARC), False),
         (header("mx.microsoft.com", SPF, DKIM, DMARC, COMPAUTH), False),
         (
-            header(SPF, DKIM, "dmarc=pass action=none header.from=other.example.test", COMPAUTH),
+            header(
+                "spf=fail (sender IP is 192.0.2.9) smtp.mailfrom=example.test",
+                "dkim=none (message not signed) header.d=none",
+                "dmarc=pass action=none header.from=unrelated.test",
+                COMPAUTH,
+            ),
             False,
         ),
         (
             header(
                 SPF,
-                "dkim=pass (signature was verified) header.d=other.example.test",
+                "dkim=pass (signature was verified) header.d=unrelated.test",
                 "dmarc=none action=none header.from=example.test",
                 COMPAUTH,
             ),

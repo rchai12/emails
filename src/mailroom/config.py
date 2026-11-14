@@ -25,6 +25,7 @@ DISCORD_CHANNEL_MESSAGE = (
 DISCORD_OWNER_MESSAGE = "MAILROOM_DISCORD_OWNER_ID must be a Discord user id (17 to 20 digits)"
 DISCORD_GUILD_MESSAGE = "MAILROOM_DISCORD_GUILD_ID must be a Discord server id (17 to 20 digits)"
 GMAIL_ACCOUNTS_MESSAGE = "MAILROOM_GMAIL_ACCOUNTS must be account names separated by commas"
+OUTLOOK_ACCOUNTS_MESSAGE = "MAILROOM_OUTLOOK_ACCOUNTS must be account names separated by commas"
 POLL_MESSAGE = "MAILROOM_POLL_SECONDS must be a whole number from 30 to 600"
 BACKUP_ATTRIBUTE = "com.apple.metadata:com_apple_backup_excludeItem"
 BACKUP_VALUE = (
@@ -56,6 +57,7 @@ _FIELD_MESSAGES = {
     "discord_owner_id": DISCORD_OWNER_MESSAGE,
     "discord_guild_id": DISCORD_GUILD_MESSAGE,
     "gmail_accounts": GMAIL_ACCOUNTS_MESSAGE,
+    "outlook_accounts": OUTLOOK_ACCOUNTS_MESSAGE,
     "poll_seconds": POLL_MESSAGE,
 }
 
@@ -93,6 +95,7 @@ class Settings(BaseSettings):
     discord_owner_id: str = ""
     discord_guild_id: str = ""
     gmail_accounts: Annotated[tuple[str, ...], NoDecode] = ()
+    outlook_accounts: Annotated[tuple[str, ...], NoDecode] = ()
     poll_seconds: int = 60
     tasks_url: str = ""
 
@@ -160,6 +163,19 @@ class Settings(BaseSettings):
         for name in names:
             if _ACCOUNT.fullmatch(name) is None or name in seen:
                 raise ValueError(GMAIL_ACCOUNTS_MESSAGE)
+            seen.add(name)
+        return names
+
+    @field_validator("outlook_accounts", mode="before")
+    @classmethod
+    def _check_outlook_accounts(cls, value: object) -> tuple[str, ...]:
+        if value == () or value == "":
+            return ()
+        names = tuple(part.strip() for part in cast(str, value).split(","))
+        seen: set[str] = set()
+        for name in names:
+            if _ACCOUNT.fullmatch(name) is None or name in seen:
+                raise ValueError(OUTLOOK_ACCOUNTS_MESSAGE)
             seen.add(name)
         return names
 

@@ -66,6 +66,7 @@ ANSWER_TEXT = {
     "edit": "Yes, with your title",
     "notask": "Not a task",
     "mute": "Not a task; sender muted",
+    "link": "Added to the existing task",
 }
 
 FORM_ACTION = "title"
@@ -207,6 +208,21 @@ COMBINED_FIRST_ROW = (
     ("notask", "Not a task", 2),
 )
 COMBINED_SECOND_ROW = (
+    ("mute", "Mute sender", 4),
+    ("trust", "Trust sender", 2),
+)
+
+# Phase 3a: the follow-up card, for an email in a thread whose earlier email was approved. "Add to
+# task" (link) records that it belongs to that task; "New task" (yes) goes on as checkpoint 1's Yes.
+FOLLOWUP_TITLE = "Follow-up to a task?"
+FOLLOWUP_TASK_NAME = "Existing task"
+FOLLOWUP_FIRST_ROW = (
+    ("full", "Show full text", 2),
+    ("link", "Add to task", 3),
+    ("yes", "New task", 1),
+    ("notask", "Not a task", 2),
+)
+FOLLOWUP_SECOND_ROW = (
     ("mute", "Mute sender", 4),
     ("trust", "Trust sender", 2),
 )

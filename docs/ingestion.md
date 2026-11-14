@@ -61,5 +61,5 @@ Email text is deleted 24 hours after the service fetches the email: the body, th
 These are kept after the 24 hours, without any email text (see [Database](architecture.md#database)):
 
 - **Dedup keys** (provider and message ID), so a later re-fetch, such as a catch-up after an outage, doesn't notify you twice about an old email.
-- **Thread-to-task mapping**, so a follow-up in an approved thread links to the existing task.
+- **Thread ids and approvals**, so a follow-up in an approved thread can be matched to the existing task (Phase 3a).
 - **Audit log entries**, which record state changes and message IDs only.

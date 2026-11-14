@@ -163,6 +163,42 @@ MIGRATIONS: tuple[str, ...] = (
         CHECK ((task_id IS NULL) = (sent_at IS NULL))
     ) STRICT;
     """,
+    # 12: the follow-up card. A post can follow an approved item in its thread, and the owner can
+    # answer "link" (add it to that task). SQLite can't change a CHECK, so posts and answers are
+    # rebuilt with their rows. `IS`, not `=`, so a NULL card can never carry a target.
+    """
+    CREATE TABLE posts_new (
+        item_id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        queued_at TEXT NOT NULL,
+        discord_message_id TEXT,
+        posted_at TEXT,
+        card TEXT CHECK (card IS NULL OR card IN ('first', 'combined', 'followup')),
+        follows TEXT,
+        UNIQUE (provider, message_id),
+        CHECK ((discord_message_id IS NULL) = (posted_at IS NULL)),
+        CHECK ((card IS 'followup') = (follows IS NOT NULL))
+    ) STRICT;
+    INSERT INTO posts_new (
+        item_id, provider, message_id, queued_at, discord_message_id, posted_at, card
+    )
+    SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at, card
+    FROM posts;
+    DROP TABLE posts;
+    ALTER TABLE posts_new RENAME TO posts;
+    CREATE TABLE answers_new (
+        item_id TEXT PRIMARY KEY,
+        answer TEXT NOT NULL CHECK (answer IN ('yes', 'edit', 'notask', 'mute', 'link')),
+        title TEXT NOT NULL,
+        answered_at TEXT NOT NULL,
+        CHECK ((answer IN ('yes', 'edit')) = (title != ''))
+    ) STRICT;
+    INSERT INTO answers_new (item_id, answer, title, answered_at)
+    SELECT item_id, answer, title, answered_at FROM answers;
+    DROP TABLE answers;
+    ALTER TABLE answers_new RENAME TO answers;
+    """,
 )
 
 SCHEMA_VERSION = len(MIGRATIONS)

@@ -93,6 +93,21 @@ Approve, Edit and No deadline on the combined card record your Yes and your chec
 | Mute sender | Item is closed and future mail from the sender is dropped by the rules |
 | Trust sender | Same as at checkpoint 1 |
 
+## Follow-ups
+
+A new email in a thread whose earlier email you approved as a task (Approve, Edit or No deadline) gets the follow-up card instead of checkpoint 1 or the combined card (Phase 3a). It shows the sender, subject, summary and the existing task's title. The thread is matched exactly by its stored thread id; nothing is guessed across threads.
+
+| Button | Result |
+| --- | --- |
+| Show full text | Same as at checkpoint 1 |
+| Add to task | Recorded as belonging to the existing task; the card closes. The tasks app gets a link to the new email on that task (Phase 3b) |
+| New task | Same as Yes at checkpoint 1: the card goes on to checkpoint 2 |
+| Not a task | Item is closed, as at checkpoint 1 |
+| Mute sender | Item is closed and future mail from the sender is dropped, as at checkpoint 1 |
+| Trust sender | Same as at checkpoint 1 |
+
+If the thread has several approved emails, the card names the one decided last. The choice is made once, just before the card is first posted, so a retry and every press use the same task. A follow-up that triage would not notify stays silent, like any email.
+
 ## Reading the full email
 
 Tapping Show full text sends the email's text as a Discord ephemeral reply: only you can see it, and it is not saved in the channel history. It disappears when you dismiss it or restart the app.

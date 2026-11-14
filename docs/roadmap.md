@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 2e done; 2f is specified.
+Status: Phases 0 to 2f done; 3a is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -34,9 +34,13 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **2c** triage decides and stores whether each email is clearly dated, with the proposed deadline kept past 24 hours (migration 8). Done.
    - **2d** the checkpoint 2 card in place after Yes or Edit title (Approve, Edit with a free-text deadline, No deadline, Not a task), and the decision recorded (migration 9). Done.
    - **2e** the combined card for clearly dated email, one step instead of two, chosen once at posting (migration 10). Done.
-   - **2f** approved tasks queued and sent to a stub tasks app on this Mac, keyed by provider and message ID so a retry never duplicates, with an alert after 15 minutes of failures (migration 11).
-3. **Send approved tasks to the real tasks app.**
+   - **2f** approved tasks queued and sent to a stub tasks app on this Mac, keyed by provider and message ID so a retry never duplicates, with an alert after 15 minutes of failures (migration 11). Done.
+3. **Follow-ups, and the real tasks app.**
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
+   Sub-phases (later ones are planned when each is specified):
+   - **3a** the follow-up card for an email in a thread with an approved item (Add to task, New task, Not a task), chosen once at posting (migration 12).
+   - **3b** Add to task sends a link to the new email on the existing task to the stub tasks app, keyed so a retry never duplicates.
+   - **3c** connecting your own tasks app once it exists, adopting the stub's contract and adding its sign-in.
 4. **live.com adapter** using the same pipeline.
    Test: identical emails give identical verdicts from Gmail and live.com.
 5. **Yahoo adapter** over IMAP using the same pipeline.

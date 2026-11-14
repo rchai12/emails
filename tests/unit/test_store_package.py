@@ -41,6 +41,7 @@ METHODS = {
     "record_approval": "approvals",
     "approval": "approvals",
     "record_combined": "approvals",
+    "approved_in_thread": "approvals",
     "queue_approved": "tasks",
     "pending_tasks": "tasks",
     "mark_task_sent": "tasks",

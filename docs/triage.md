@@ -29,7 +29,7 @@ The extractor can suggest that an email looks like spam or phishing, for example
 
 ## Details
 
-- A follow-up in a thread you already approved links to the existing task instead of creating a new one. The [database](architecture.md#database) keeps the thread-to-task mapping after email text is deleted.
+- A follow-up in a thread you already approved gets the [follow-up card](approval-flow.md#follow-ups), which asks whether to add it to the existing task instead of creating a new one. The thread is matched through stored approvals and thread ids, which are kept after email text is deleted.
 - Repeated "Not a task" answers for a sender lower that sender's score automatically.
 - Relative dates such as "by Friday" are resolved against the email's sent date and your time zone, and the evidence quote is shown with the deadline.
 - Email text goes only to the local model.

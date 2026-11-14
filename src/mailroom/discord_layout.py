@@ -148,6 +148,8 @@ REGISTERED_TEXT = "Registered {count} commands in your server."
 # themselves fixed text); never email text. Action alerts mention the owner.
 ALERT_GMAIL_AUTH = "Gmail sign-in needed for {account}. Run: mailroom gmail-login {account}"
 ALERT_GMAIL_FIXED = "Gmail {account} works again."
+ALERT_OUTLOOK_AUTH = "Outlook sign-in needed for {account}. Run: mailroom outlook-login {account}"
+ALERT_OUTLOOK_FIXED = "Outlook {account} works again."
 ALERT_GATEWAY = (
     "The Discord listener stopped: {reason}. Buttons and commands won't answer until the "
     "service is restarted."
@@ -162,8 +164,8 @@ ALERT_TASKS = (
     "retried every round."
 )
 ALERT_TASKS_FIXED = "The tasks app works again. Queued tasks are being sent."
-ALERT_CATCH_UP = "Gmail {account} caught up after {offline} offline: {found}."
-ALERT_GAP = " It was offline for more than 14 days, so check older mail in Gmail yourself."
+ALERT_CATCH_UP = "{provider} {account} caught up after {offline} offline: {found}."
+ALERT_GAP = " It was offline for more than 14 days, so check older mail in {provider} yourself."
 LESS_THAN_AN_HOUR = "less than an hour"
 
 # Phase 2d: checkpoint 2. The card the owner pressed turns into this after Yes or a submitted

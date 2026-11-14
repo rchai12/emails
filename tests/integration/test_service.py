@@ -333,7 +333,7 @@ def test_the_service_refuses_to_start_without_its_settings(
     with pytest.raises(ServiceError) as caught:
         serve(world, get_settings(), Rounds(1), lambda *args, **kwargs: None)
     assert str(caught.value) == (
-        "not configured: MAILROOM_GMAIL_ACCOUNTS, MAILROOM_EXTRACTOR_MODEL, "
-        "MAILROOM_DISCORD_CHANNEL_ID, MAILROOM_DISCORD_OWNER_ID"
+        "not configured: MAILROOM_GMAIL_ACCOUNTS or MAILROOM_OUTLOOK_ACCOUNTS, "
+        "MAILROOM_EXTRACTOR_MODEL, MAILROOM_DISCORD_CHANNEL_ID, MAILROOM_DISCORD_OWNER_ID"
     )
     assert world.lines == []

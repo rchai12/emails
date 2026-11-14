@@ -29,6 +29,7 @@ The extractor can suggest that an email looks like spam or phishing, for example
 
 ## Details
 
+- **Outlook verification** (Phase 4d): Microsoft's `Authentication-Results` header has no server name. Outlook mail is verified from the first such header, when it carries `compauth`, by the same DMARC and SPF/DKIM rule as Gmail, so a trusted sender is trusted on either provider.
 - A follow-up in a thread you already approved gets the [follow-up card](approval-flow.md#follow-ups), which asks whether to add it to the existing task instead of creating a new one. The thread is matched through stored approvals and thread ids, which are kept after email text is deleted.
 - Repeated "Not a task" answers for a sender lower that sender's score automatically.
 - Relative dates such as "by Friday" are resolved against the email's sent date and your time zone, and the evidence quote is shown with the deadline.

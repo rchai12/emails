@@ -50,8 +50,15 @@ def consent_url(client_id: str, redirect_uri: str, state: str, challenge: str) -
 
 
 class Callback:
-    def __init__(self, account: str, *, request_timeout: float = REQUEST_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        account: str,
+        *,
+        provider: str = "gmail",
+        request_timeout: float = REQUEST_TIMEOUT_SECONDS,
+    ) -> None:
         self._account = account
+        self._provider = provider
         self._state = ""
         self._code: str | None = None
         self._cancelled = False
@@ -73,13 +80,13 @@ class Callback:
         while True:
             moment = clock.now()
             if moment >= deadline:
-                raise LoginError(f"gmail login timed out: {self._account}") from None
+                raise LoginError(f"{self._provider} login timed out: {self._account}") from None
             self._server.timeout = (deadline - moment).total_seconds()
             self._server.handle_request()
             if self._code is not None:
                 return self._code
             if self._cancelled:
-                raise LoginError(f"gmail login cancelled: {self._account}") from None
+                raise LoginError(f"{self._provider} login cancelled: {self._account}") from None
 
     def _handle(self, target: str) -> tuple[int, str]:
         parsed = urlsplit(target)

@@ -4,12 +4,13 @@ import webbrowser
 
 import typer
 
-from mailroom import __version__, commands, discord_post, gmail_login, service
+from mailroom import __version__, commands, discord_post, gmail_login, outlook_login, service
 from mailroom import discord_layout as L
 from mailroom.config import ConfigError, get_settings
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.gmail import GmailError
 from mailroom.keychain import KeychainError
+from mailroom.outlook import OutlookError
 
 app = typer.Typer()
 
@@ -43,6 +44,29 @@ def gmail_login_command(account: str, new_client: bool = False) -> None:
             new_client=new_client,
         )
     except (gmail_login.LoginError, GmailError, KeychainError, ValueError) as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from None
+    typer.echo(f"Signed in: {account} ({signed_in})")
+
+
+@app.command("outlook-login")
+def outlook_login_command(account: str, new_client: bool = False) -> None:
+    """Sign in to one live.com account and store its refresh token."""
+
+    def open_browser(address: str) -> None:
+        typer.echo("Opening Microsoft sign-in. If no browser opens, visit:")
+        typer.echo(address)
+        webbrowser.open(address)
+
+    try:
+        signed_in = outlook_login.login(
+            account,
+            outlook_login.new_http(),
+            ask=lambda label: typer.prompt(label, hide_input=True),
+            open_browser=open_browser,
+            new_client=new_client,
+        )
+    except (gmail_login.LoginError, OutlookError, KeychainError, ValueError) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from None
     typer.echo(f"Signed in: {account} ({signed_in})")

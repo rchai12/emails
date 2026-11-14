@@ -12,6 +12,8 @@ from mailroom.store.senders import SENDER_MESSAGE, STATUS_MESSAGE
 from mailroom.store.senders import SenderStore as _SenderStore
 from mailroom.store.sync import SyncState
 from mailroom.store.sync import SyncStore as _SyncStore
+from mailroom.store.tasks import Task
+from mailroom.store.tasks import TaskStore as _TaskStore
 from mailroom.store.triage import Due, StoredTriage, Verdict
 from mailroom.store.triage import TriageStore as _TriageStore
 
@@ -32,6 +34,7 @@ __all__ = [
     "StoredMessage",
     "StoredTriage",
     "SyncState",
+    "Task",
     "Verdict",
     "open_store",
 ]
@@ -45,6 +48,7 @@ class Store(
     _PostStore,
     _AlertStore,
     _ApprovalStore,
+    _TaskStore,
 ):
     pass
 

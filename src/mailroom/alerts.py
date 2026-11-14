@@ -11,6 +11,7 @@ from mailroom.discord_post import DiscordUnavailable, PostReport, send_messages
 from mailroom.store import Alert, Store
 
 MODEL_WAIT = timedelta(minutes=15)
+TASKS_WAIT = timedelta(minutes=15)
 
 
 def track(

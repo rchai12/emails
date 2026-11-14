@@ -190,3 +190,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 2f: Stub tasks app (2026-11-13)
+- Tests: 961 -> 1010 (given 49)
+- New public names: `config`: `TASKS_URL_MESSAGE`, `tasks_url`; `store`: `Task`, `queue_approved`, `pending_tasks`, `mark_task_sent`, `task`; `tasks_app`: `TasksUnavailable`, `task_key`, `task_payload`, `open_tasks_http`, `send_tasks`; `alerts`: `TASKS_WAIT`
+- Changed files: 7
+- Deviations:
+  - None
+- Follow-ups:
+  - None

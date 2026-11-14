@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import httpx
 
-from mailroom import alerts, clock, discord_post, extractor, gmail, gmail_sync, triage
+from mailroom import alerts, clock, discord_post, extractor, gmail, gmail_sync, tasks_app, triage
 from mailroom import discord_layout as L
 from mailroom.config import Settings
 from mailroom.discord_post import DiscordUnavailable, PostReport
@@ -16,6 +16,7 @@ from mailroom.gmail import GmailAuthError, GmailClient, GmailError
 from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError
 from mailroom.store import Store, open_store
+from mailroom.tasks_app import TasksUnavailable
 
 _REQUIRED = (
     ("gmail_accounts", "MAILROOM_GMAIL_ACCOUNTS"),
@@ -50,6 +51,7 @@ def run_round(
     gmail_clients: Sequence[GmailClient],
     model_http: httpx.Client,
     discord_http: httpx.Client,
+    tasks_http: httpx.Client,
     health: Health,
 ) -> None:
     store.clear_expired_text()
@@ -77,6 +79,10 @@ def run_round(
         health.report("triage", "ok")
         if triaged:
             _model(store, False)
+    _tasks(
+        store,
+        _status(health, "tasks", lambda: tasks_app.send_tasks(store, settings, tasks_http)),
+    )
     _status(
         health, "discord posting", lambda: discord_post.post_pending(store, settings, discord_http)
     )
@@ -91,6 +97,7 @@ def run_service(
     open_gmail: Callable[[str], GmailClient] = gmail.open_gmail,
     open_model_http: Callable[[], httpx.Client] = extractor.open_model_http,
     open_discord_http: Callable[[], httpx.Client] = discord_post.open_discord_http,
+    open_tasks_http: Callable[[], httpx.Client] = tasks_app.open_tasks_http,
     gateway: Callable[..., None] = run_gateway,
 ) -> None:
     missing = [
@@ -105,6 +112,7 @@ def run_service(
     gmail_clients = [open_gmail(account) for account in settings.gmail_accounts]
     model_http = open_model_http()
     discord_http = open_discord_http()
+    tasks_http = open_tasks_http()
     health.report("discord gateway", "running")
     thread = threading.Thread(
         target=_listen,
@@ -119,12 +127,12 @@ def run_service(
             if not first and thread.is_alive():
                 _gateway(store, False, "")
             first = False
-            run_round(store, settings, gmail_clients, model_http, discord_http, health)
+            run_round(store, settings, gmail_clients, model_http, discord_http, tasks_http, health)
             stop.wait(settings.poll_seconds)
     finally:
         stop.set()
         thread.join(10)
-        _close(store, gmail_clients, model_http, discord_http)
+        _close(store, gmail_clients, model_http, discord_http, tasks_http)
 
 
 def _listen(
@@ -151,16 +159,31 @@ def _listen(
         store.close()
 
 
-def _status(health: Health, part: str, call: Callable[[], PostReport]) -> None:
+def _status(health: Health, part: str, call: Callable[[], PostReport]) -> PostReport | None:
     try:
         report = call()
-    except (DiscordUnavailable, KeychainError) as error:
+    except (DiscordUnavailable, KeychainError, TasksUnavailable) as error:
         health.report(part, str(error))
-        return
+        return None
     if report.stopped:
         health.report(part, f"waiting ({report.stopped})")
-        return
+        return report
     health.report(part, "ok")
+    return report
+
+
+def _tasks(store: Store, report: PostReport | None) -> None:
+    if report is None or (not report.stopped and report.posted == 0):
+        return
+    alerts.track(
+        store,
+        "tasks",
+        bool(report.stopped),
+        wait=alerts.TASKS_WAIT,
+        raised=L.ALERT_TASKS,
+        ping=False,
+        resolved=L.ALERT_TASKS_FIXED,
+    )
 
 
 def _gmail(store: Store, account: str, failing: bool) -> None:
@@ -214,9 +237,11 @@ def _close(
     gmail_clients: Sequence[GmailClient],
     model_http: httpx.Client,
     discord_http: httpx.Client,
+    tasks_http: httpx.Client,
 ) -> None:
     store.close()
     for client in gmail_clients:
         client.http.close()
     model_http.close()
     discord_http.close()
+    tasks_http.close()

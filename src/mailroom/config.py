@@ -15,6 +15,9 @@ DATA_DIR_MESSAGE = "MAILROOM_DATA_DIR must be an absolute path"
 EXTRACTOR_URL_MESSAGE = (
     "MAILROOM_EXTRACTOR_URL must be http:// on 127.0.0.1, localhost or [::1], with no path"
 )
+TASKS_URL_MESSAGE = (
+    "MAILROOM_TASKS_URL must be empty or http:// on 127.0.0.1, localhost or [::1], with no path"
+)
 TIME_ZONE_MESSAGE = "MAILROOM_TIME_ZONE must be an IANA time zone name"
 DISCORD_CHANNEL_MESSAGE = (
     "MAILROOM_DISCORD_CHANNEL_ID must be a Discord channel id (17 to 20 digits)"
@@ -47,6 +50,7 @@ _SETXATTR.restype = ctypes.c_int
 _FIELD_MESSAGES = {
     "data_dir": DATA_DIR_MESSAGE,
     "extractor_url": EXTRACTOR_URL_MESSAGE,
+    "tasks_url": TASKS_URL_MESSAGE,
     "time_zone": TIME_ZONE_MESSAGE,
     "discord_channel_id": DISCORD_CHANNEL_MESSAGE,
     "discord_owner_id": DISCORD_OWNER_MESSAGE,
@@ -90,6 +94,7 @@ class Settings(BaseSettings):
     discord_guild_id: str = ""
     gmail_accounts: Annotated[tuple[str, ...], NoDecode] = ()
     poll_seconds: int = 60
+    tasks_url: str = ""
 
     @field_validator("data_dir", mode="before")
     @classmethod
@@ -105,6 +110,13 @@ class Settings(BaseSettings):
         if not _loopback_http(value):
             raise ValueError(EXTRACTOR_URL_MESSAGE)
         return value
+
+    @field_validator("tasks_url")
+    @classmethod
+    def _check_tasks_url(cls, value: str) -> str:
+        if value == "" or _loopback_http(value):
+            return value
+        raise ValueError(TASKS_URL_MESSAGE)
 
     @field_validator("time_zone")
     @classmethod

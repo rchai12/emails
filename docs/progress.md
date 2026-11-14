@@ -208,3 +208,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 3b: Follow-up links (2026-11-13)
+- Tests: 1051 -> 1090 (given 39)
+- New public names: `store`: `Link`, `queue_linked`, `pending_links`, `mark_link_sent`, `link`; `tasks_app`: `is_task_id`, `link_payload`
+- Changed files: 4
+- Deviations:
+  - None
+- Follow-ups:
+  - None

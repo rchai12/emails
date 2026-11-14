@@ -1,8 +1,12 @@
+import re
+
 import httpx
 
 from mailroom.config import Settings
 from mailroom.discord_post import PostReport
-from mailroom.store import Approval, Store, Task
+from mailroom.store import Approval, Link, Store, Task
+
+_TASK_ID = re.compile(r"\A[A-Za-z0-9_-]{1,100}\Z")
 
 
 class TasksUnavailable(Exception):
@@ -34,6 +38,19 @@ def task_payload(task: Task, approval: Approval, link: str, time_zone: str) -> d
     }
 
 
+def is_task_id(task_id: str) -> bool:
+    return _TASK_ID.fullmatch(task_id) is not None
+
+
+def link_payload(link: Link, email_link: str) -> dict[str, object]:
+    return {
+        "source": "email",
+        "provider": link.provider,
+        "message_id": link.message_id,
+        "link": email_link,
+    }
+
+
 def open_tasks_http() -> httpx.Client:
     return httpx.Client(timeout=30.0, trust_env=False, follow_redirects=False)
 
@@ -62,7 +79,7 @@ def send_tasks(store: Store, settings: Settings, http: httpx.Client) -> PostRepo
             return PostReport(posted, len(pending) - index, "response")
         store.mark_task_sent(task.item_id, task_id)
         posted += 1
-    return PostReport(posted, 0, "")
+    return _send_links(store, settings, http, posted)
 
 
 def _task_id(response: httpx.Response) -> str | None:
@@ -70,6 +87,27 @@ def _task_id(response: httpx.Response) -> str | None:
         found = response.json()["id"]
     except (ValueError, TypeError, KeyError):
         return None
-    if isinstance(found, str) and 1 <= len(found) <= 100:
+    if isinstance(found, str) and is_task_id(found):
         return found
     return None
+
+
+def _send_links(store: Store, settings: Settings, http: httpx.Client, posted: int) -> PostReport:
+    store.queue_linked()
+    pending = store.pending_links()
+    linked = 0
+    for index, link in enumerate(pending):
+        email_link = store.get(link.provider, link.message_id).record.link
+        try:
+            response = http.post(
+                f"{settings.tasks_url}/tasks/{link.task_id}/links",
+                json=link_payload(link, email_link),
+                headers={"Idempotency-Key": task_key(link.provider, link.message_id)},
+            )
+        except httpx.TransportError:
+            return PostReport(posted + linked, len(pending) - index, "network")
+        if response.status_code not in (200, 201):
+            return PostReport(posted + linked, len(pending) - index, str(response.status_code))
+        store.mark_link_sent(link.item_id)
+        linked += 1
+    return PostReport(posted + linked, 0, "")

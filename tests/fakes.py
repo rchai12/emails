@@ -1050,7 +1050,8 @@ class FakeGraph:
     three ways: only the latest refresh token works (each refresh issues a new one), every Graph
     request needs `Prefer: IdType="ImmutableId"` (else 400), and only these calls are answered:
 
-    - `POST TOKEN_URL`, form `client_id`, `refresh_token`, `grant_type=refresh_token`, `scope`;
+    - `POST TOKEN_URL`, form `client_id`, `refresh_token`, `grant_type=refresh_token`, `scope`,
+      or the authorization-code grant after `consent` (see there);
     - `GET /me` (`mail`, `userPrincipalName`) and `GET /me/mailFolders/inbox` (`id`);
     - `GET /me/mailFolders/inbox/messages/delta?changeType=created&$select=...&$filter=
       receivedDateTime ge <ISO>`: inbox messages received since then, then a delta link;
@@ -1065,6 +1066,7 @@ class FakeGraph:
     """
 
     TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    AUTH_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
     API = "https://graph.microsoft.com/v1.0/me"
     SCOPE = "https://graph.microsoft.com/Mail.Read offline_access"
     FOLDERS = {"inbox": "inbox-folder-1", "junkemail": "junk-folder-1"}
@@ -1076,6 +1078,8 @@ class FakeGraph:
         self.user_principal_name = "owner@example.test"
         self.expires_in = 3600
         self.expired_code = ""
+        self.granted_scope = "https://graph.microsoft.com/Mail.Read"
+        self.codes: dict[str, dict[str, str]] = {}
         self.messages: dict[str, dict[str, object]] = {}
         self.log: list[dict[str, object]] = []
         self.gone: set[str] = set()
@@ -1116,7 +1120,10 @@ class FakeGraph:
             self.log.append({"id": message_id, "@removed": {"reason": "deleted"}})
 
     def expire_deltas(self) -> None:
-        self._oldest = len(self.log) + 1
+        """Expire every link given so far; links given afterwards work (a marker in the log
+        sets them apart, since a link names only how much of the log it has seen)."""
+        self.log.append({"marker": True})
+        self._oldest = len(self.log)
 
     def delete(self, message_id: str) -> None:
         """Delete a message for good: rounds already listed keep it, but fetching it is 404."""
@@ -1161,8 +1168,79 @@ class FakeGraph:
         assert isinstance(failure, httpx.Response)
         return failure
 
+    def consent(self, url: str, *, approve: bool = True) -> str:
+        """Microsoft's sign-in page: check the request, and return where it sends the browser.
+
+        An approved sign-in gives a one-time code, kept with the request's PKCE challenge and
+        redirect address; the token endpoint checks both. Like Microsoft, the answer also carries
+        `session_state`, and a refusal carries `error_description`.
+        """
+        request = httpx.URL(url)
+        params = request.params
+        expected = {
+            "client_id": self.client_id,
+            "response_type": "code",
+            "response_mode": "query",
+            "scope": self.SCOPE,
+            "code_challenge_method": "S256",
+            "prompt": "select_account",
+        }
+        assert str(request.copy_with(query=None)) == self.AUTH_URL, "not Microsoft's sign-in page"
+        for key, value in expected.items():
+            assert params.get_list(key) == [value], f"sign-in request: {key}"
+        for key in ("redirect_uri", "code_challenge", "state"):
+            assert len(params.get_list(key)) == 1, f"sign-in request: {key}"
+        redirect = params["redirect_uri"]
+        if not approve:
+            refusal = {
+                "error": "access_denied",
+                "error_description": "AADSTS65004: User declined to consent.",
+                "state": params["state"],
+            }
+            return str(httpx.URL(redirect, params=refusal))
+        code = f"code-{len(self.codes) + 1}"
+        self.codes[code] = {"challenge": params["code_challenge"], "redirect_uri": redirect}
+        answer = {"code": code, "state": params["state"], "session_state": "session-1"}
+        return str(httpx.URL(redirect, params=answer))
+
+    def _exchange_code(self, request: httpx.Request, form: dict[str, str]) -> httpx.Response:
+        """The authorization-code grant: a code is used once, with its PKCE verifier."""
+        grant = self.codes.pop(form.get("code", ""), None)
+        digest = hashlib.sha256(form.get("code_verifier", "").encode()).digest()
+        challenge = base64.urlsafe_b64encode(digest).decode().rstrip("=")
+        keys = {"client_id", "scope", "code", "redirect_uri", "grant_type", "code_verifier"}
+        if (
+            request.method != "POST"
+            or set(form) != keys
+            or grant is None
+            or form["client_id"] != self.client_id
+            or form["scope"] != self.SCOPE
+            or form["redirect_uri"] != grant["redirect_uri"]
+            or challenge != grant["challenge"]
+        ):
+            return httpx.Response(
+                400,
+                json={"error": "invalid_grant", "error_description": "AADSTS70000: Bad grant."},
+            )
+        self.refresh_token = f"refresh-token-from-{form['code']}"
+        token = f"access-{len(self.issued) + 1}"
+        self.issued.append(token)
+        self.valid.add(token)
+        return httpx.Response(
+            200,
+            json={
+                "token_type": "Bearer",
+                "scope": self.granted_scope,
+                "expires_in": self.expires_in,
+                "access_token": token,
+                "refresh_token": self.refresh_token,
+            },
+        )
+
     def _token(self, request: httpx.Request) -> httpx.Response:
         form = dict(httpx.QueryParams(request.content.decode()))
+        if form.get("grant_type") == "authorization_code":
+            return self._exchange_code(request, form)
         expected = {
             "client_id": self.client_id,
             "refresh_token": self.refresh_token,
@@ -1207,7 +1285,8 @@ class FakeGraph:
                 if self.expired_code:
                     return self._error(400, self.expired_code, "The sync state was not found.")
                 return self._error(410, "SyncStateNotFound", "Resync required.")
-            items, offset = [dict(entry) for entry in self.log[seen:]], 0
+            items = [dict(entry) for entry in self.log[seen:] if "marker" not in entry]
+            offset = 0
             seen = len(self.log)
         else:
             if params.get("changeType") != "created" or not params.get("$filter", "").startswith(

@@ -19,7 +19,7 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 - **Refresh tokens rotate.** Each refresh returns a new refresh token, which replaces the old one in the Keychain (Phase 4a).
 - **New mail** is found by polling the inbox with delta queries (`changeType=created`), with immutable ids so a message keeps its id when moved. A page link is followed only to `graph.microsoft.com`, so the token never goes anywhere else.
 - **Inbox only, once each** (Phase 4b). A listed message is stored only if it is still in the inbox when fetched. The bookmark is the delta link, saved after a whole round. An expired link catches up as for Gmail. The card's link is Graph's `webLink` when it is on `outlook.live.com`, otherwise the Outlook inbox.
-- **Login** (Phase 4c): Microsoft's consent page in your browser, answered on a one-request listener on 127.0.0.1 with PKCE, as for Gmail.
+- **Login** (Phase 4c): `mailroom outlook-login <account>` opens Microsoft's sign-in page (personal accounts, `prompt=select_account`), answered on Gmail login's one-request listener on 127.0.0.1 with PKCE. The first time it asks for the app's client ID (hidden); `--new-client` replaces it. The refresh token is kept only for a grant of `Mail.Read` (and `offline_access` at most), and nothing is stored unless the exchange succeeds. It finishes by showing the account's address.
 
 ## Yahoo
 

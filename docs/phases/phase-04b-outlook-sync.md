@@ -19,6 +19,14 @@ Follow `docs/phase-conventions.md`. N is 1142, the tests the previous phase left
 
 Start: `.venv/bin/python -m pytest --no-cov -q --ignore=tests/integration/test_outlook_sync.py` must show `1142 passed`. The ignored file imports `mailroom.outlook_sync`, which you create.
 
+## Corrections
+
+- **2026-11-13, after the review (PASS).** The verifier found three faults in the given files; the code was right.
+  - **The test count.** `test_outlook_sync.py` has 17 tests, not 18: I miscounted the functions.
+  - **FakeGraph's expiry.** `expire_deltas()` also expired a link issued right after it when no mail had arrived in between, because a link names only how much of the log it has seen. The next round became an unneeded catch-up. `expire_deltas()` now adds a marker to the log, which no round lists, so later links count past it. The catch-up test's bookmark is therefore `d3`, not `d2`.
+  - **The probe.** It excused an old message moved into the inbox only when the link expired after the move; now it also excuses a move while an expired link waits for its catch-up. It also counted any second download as a fault. 4a's `fetch` downloads the text along with the folder, so mail moved to junk before its fetch is legitimately downloaded again if it comes back. The rule is now "never downloaded once stored".
+  On the committed `outlook_sync.py`, the given tests pass and the probe prints `FAILURES 0`. With the "already stored" check removed, the probe prints `FAIL`.
+
 ## Facts
 
 Checked against the 4a client and the fake on this machine, and in Microsoft's documentation. Nothing here was checked against a real account.

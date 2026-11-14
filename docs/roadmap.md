@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 3b done; 3c waits for the tasks app; 4a done; 4b is specified.
+Status: Phases 0 to 3b done; 3c waits for the tasks app; 4a and 4b done; 4c is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -45,7 +45,7 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    Test: identical emails give identical verdicts from Gmail and live.com.
    Sub-phases (later ones are planned when each is specified):
    - **4a** the Graph client: rotating tokens, inbox delta rounds and the raw message, read-only, against a fake Graph. Done.
-   - **4b** Outlook sync: the delta bookmark, inbox only, dedup, first run (3 days), catch-up after an expired link.
+   - **4b** Outlook sync: the delta bookmark, inbox only, dedup, first run (3 days), catch-up after an expired link. Done.
    - **4c** `mailroom outlook-login`: browser consent on a 127.0.0.1 listener that stores the refresh token.
    - **4d** Outlook in the service: settings, each round, alerts, the card footer, and stage 4's test.
 5. **Yahoo adapter** over IMAP using the same pipeline.

@@ -161,7 +161,7 @@ def test_an_expired_bookmark_catches_up_from_the_last_round_with_an_hour_overlap
     )
     assert first_filter(graph) == "receivedDateTime ge 2026-11-13T08:00:00Z"
     assert fetched(graph) == ["/v1.0/me/messages/AAMk1=/$value", "/v1.0/me/messages/AAMk2=/$value"]
-    assert store.sync_state("outlook", "live").bookmark == f"{DELTA}?$deltatoken=d2"
+    assert store.sync_state("outlook", "live").bookmark == f"{DELTA}?$deltatoken=d3"
 
 
 def test_a_catch_up_after_more_than_14_days_reads_14_days_and_says_so(

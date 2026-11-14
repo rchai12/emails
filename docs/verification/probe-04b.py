@@ -4,10 +4,12 @@ Each trial runs Outlook sync for many rounds against FakeGraph while, between ro
 arrives in the inbox or in junk, moves between them, or is deleted, the delta links expire, and
 some rounds fail at a random request. The probe's own model of the mailbox says:
 - nothing that was never in the inbox is ever stored;
-- no message is downloaded successfully twice;
+- no message is downloaded once it is stored (one moved to junk before its fetch is downloaded,
+  skipped, and may be downloaded again if it comes back);
 - a failed round leaves the bookmark as it was;
 - after a final clean round, every message still in the inbox (and not deleted) is stored, except
-  one moved into the inbox and then caught by an expired link before it was stored: a catch-up
+  one moved into the inbox while an expired link waits for its catch-up (the link expiring before
+  or after the move): a catch-up
   lists mail by when it was received, so an old message moved in can fall outside its window, as
   the design says for Gmail too.
 Fakes only; everything lives in a temporary folder. The check prints `ok` or `FAIL`; the last
@@ -18,7 +20,6 @@ import os
 import random
 import sys
 import tempfile
-from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -63,13 +64,14 @@ print("oracle self-check: ok")
 
 
 class Watched:
-    """FakeGraph that fails the round's chosen request and counts each successful download."""
+    """FakeGraph that fails the round's chosen request and notes downloads of stored mail."""
 
     def __init__(self, graph: FakeGraph) -> None:
         self.graph = graph
         self.fail_at = 0
         self.count = 0
-        self.downloads: Counter[str] = Counter()
+        self.store = None
+        self.again: list[str] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         if request.url.host == "graph.microsoft.com":
@@ -78,7 +80,9 @@ class Watched:
                 return httpx.Response(503)
         response = self.graph.handler(request)
         if request.url.path.endswith("/$value") and response.status_code == 200:
-            self.downloads[request.url.path.split("/")[-2]] += 1
+            message_id = request.url.path.split("/")[-2]
+            if self.store.get("outlook", f"live/{message_id}") is not None:
+                self.again.append(message_id)
         return response
 
 
@@ -107,7 +111,9 @@ def sync_follows_the_mailbox() -> object:
         deleted: set[str] = set()
         moved_in: set[str] = set()
         excused: set[str] = set()
+        expired_pending = False
         with open_store(get_settings()) as store:
+            watched.store = store
             for round_number in range(16):
                 for _ in range(rng.randrange(4)):
                     action = rng.choice(("inbox", "inbox", "junk", "move", "delete"))
@@ -137,10 +143,14 @@ def sync_follows_the_mailbox() -> object:
                         ever_in_inbox.add(message_id)
                         moved_in.add(message_id)
                         reached["moved-in"] += 1
+                        if expired_pending:
+                            # The link already expired and no round has caught up yet.
+                            excused.add(message_id)
                     else:
                         reached["moved-out"] += 1
                 if round_number and rng.random() < 0.15:
                     graph.expire_deltas()
+                    expired_pending = True
                     reached["expired"] += 1
                     excused |= {
                         message_id
@@ -154,6 +164,7 @@ def sync_follows_the_mailbox() -> object:
                 http = httpx.Client(transport=httpx.MockTransport(watched.handler))
                 try:
                     sync_outlook(OutlookClient("live", http), store)
+                    expired_pending = False
                 except OutlookError:
                     reached["failed"] += 1
                     if store.sync_state("outlook", "live") != before:
@@ -168,9 +179,8 @@ def sync_follows_the_mailbox() -> object:
                 wanted = where[message_id] == "inbox" and message_id not in deleted
                 if wanted and not stored and message_id not in excused:
                     return f"trial {trial}: {message_id} is in the inbox but not stored"
-            twice = [message_id for message_id, count in watched.downloads.items() if count > 1]
-            if twice:
-                return f"trial {trial}: downloaded twice: {twice[0]}"
+            if watched.again:
+                return f"trial {trial}: downloaded after it was stored: {watched.again[0]}"
     if min(reached.values()) < 10:
         return f"too few cases: {reached}"
     return True

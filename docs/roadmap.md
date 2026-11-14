@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status: Phases 0 to 3a done; 3b is specified.
+Status: Phases 0 to 3b done; 3c waits for the tasks app; 4a is specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -39,10 +39,15 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    Test: an approved email produces exactly one task, even when the send is retried; a follow-up in the same thread links to it instead of creating a duplicate, including when the follow-up arrives more than 24 hours later.
    Sub-phases (later ones are planned when each is specified):
    - **3a** the follow-up card for an email in a thread with an approved item (Add to task, New task, Not a task), chosen once at posting (migration 12). Done.
-   - **3b** Add to task sends a link to the new email on the existing task to the stub tasks app, keyed so a retry never duplicates, once that task has its id (migration 13).
-   - **3c** connecting your own tasks app once it exists, adopting the stub's contract and adding its sign-in.
+   - **3b** Add to task sends a link to the new email on the existing task to the stub tasks app, keyed so a retry never duplicates, once that task has its id (migration 13). Done.
+   - **3c** connecting your own tasks app, adopting the stub's contract and adding its sign-in. Deferred until the tasks app exists (owner's decision, Nov 13, 2026); stage 4 goes first.
 4. **live.com adapter** using the same pipeline.
    Test: identical emails give identical verdicts from Gmail and live.com.
+   Sub-phases (later ones are planned when each is specified):
+   - **4a** the Graph client: rotating tokens, inbox delta rounds and the raw message, read-only, against a fake Graph.
+   - **4b** Outlook sync: the delta bookmark, inbox only, dedup, first run (3 days), catch-up after an expired link.
+   - **4c** `mailroom outlook-login`: browser consent on a 127.0.0.1 listener that stores the refresh token.
+   - **4d** Outlook in the service: settings, each round, alerts, the card footer, and stage 4's test.
 5. **Yahoo adapter** over IMAP using the same pipeline.
    Test: identical emails give identical verdicts from all three providers; a poll leaves every message unread and unchanged in Yahoo; a `UIDVALIDITY` change creates no duplicates.
 6. **Hardening.**

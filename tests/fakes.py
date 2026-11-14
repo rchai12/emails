@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from urllib.parse import unquote
 
 import httpx
 from keyring.backend import KeyringBackend
@@ -1038,3 +1039,226 @@ class FakeTasksApp:
         return (
             len(day) == 10 and (at is None or len(at) == 5) and isinstance(zone, str) and zone != ""
         )
+
+
+class FakeGraph:
+    """Microsoft's token endpoint (personal accounts) and the Graph mail calls mailroom reads.
+
+    Shapes follow the Graph reference: errors are `{"error": {"code", "message"}}`, delta pages
+    carry `value` and one of `@odata.nextLink` or `@odata.deltaLink`, a removed item is
+    `{"id", "@removed": {"reason"}}`, and `$value` is the raw MIME. Stricter than Microsoft in
+    three ways: only the latest refresh token works (each refresh issues a new one), every Graph
+    request needs `Prefer: IdType="ImmutableId"` (else 400), and only these calls are answered:
+
+    - `POST TOKEN_URL`, form `client_id`, `refresh_token`, `grant_type=refresh_token`, `scope`;
+    - `GET /me` (`mail`, `userPrincipalName`) and `GET /me/mailFolders/inbox` (`id`);
+    - `GET /me/mailFolders/inbox/messages/delta?changeType=created&$select=...&$filter=
+      receivedDateTime ge <ISO>`: inbox messages received since then, then a delta link;
+    - a `nextLink` or `deltaLink` it gave, exactly; `expire_deltas()` makes every earlier link
+      answer 410 (or 400 `syncStateNotFound` with `expired_code`);
+    - `GET /me/messages/<id>` (`conversationId`, `parentFolderId`, `receivedDateTime`, `webLink`)
+      and `GET /me/messages/<id>/$value`; an unknown id is 404 `ErrorItemNotFound`.
+
+    Pages hold `Prefer: odata.maxpagesize` items (default 10). `failures` answers Graph requests
+    and `token_failures` the token endpoint, each entry before any check: an exception is
+    raised, a response returned. Every request is kept in `requests`.
+    """
+
+    TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    API = "https://graph.microsoft.com/v1.0/me"
+    SCOPE = "https://graph.microsoft.com/Mail.Read offline_access"
+    FOLDERS = {"inbox": "inbox-folder-1", "junkemail": "junk-folder-1"}
+
+    def __init__(self) -> None:
+        self.client_id = "client-id-1"
+        self.refresh_token = "refresh-token-1"
+        self.mail: str | None = "owner@example.test"
+        self.user_principal_name = "owner@example.test"
+        self.expires_in = 3600
+        self.expired_code = ""
+        self.messages: dict[str, dict[str, object]] = {}
+        self.log: list[dict[str, object]] = []
+        self.valid: set[str] = set()
+        self.issued: list[str] = []
+        self.failures: list[object] = []
+        self.token_failures: list[object] = []
+        self.requests: list[httpx.Request] = []
+        self._pages: dict[str, tuple[list[dict[str, object]], int, int]] = {}
+        self._oldest = 0
+
+    def add_message(
+        self,
+        message_id: str,
+        raw: bytes,
+        *,
+        conversation_id: str | None = None,
+        folder: str = "inbox",
+        received: str = "2026-11-10T08:00:00Z",
+    ) -> None:
+        """Deliver a message; one delivered to the inbox shows in later delta rounds."""
+        self.messages[message_id] = {
+            "conversationId": conversation_id or f"conversation-{message_id}",
+            "parentFolderId": self.FOLDERS[folder],
+            "receivedDateTime": received,
+            "webLink": f"https://outlook.live.com/owa/?ItemID={message_id}&exvsurl=1",
+            "raw": raw,
+        }
+        if folder == "inbox":
+            self.log.append({"id": message_id})
+
+    def move(self, message_id: str, folder: str) -> None:
+        """Move a message; leaving the inbox shows as removed, arriving as created."""
+        self.messages[message_id]["parentFolderId"] = self.FOLDERS[folder]
+        if folder == "inbox":
+            self.log.append({"id": message_id})
+        else:
+            self.log.append({"id": message_id, "@removed": {"reason": "deleted"}})
+
+    def expire_deltas(self) -> None:
+        self._oldest = len(self.log) + 1
+
+    def invalidate_tokens(self) -> None:
+        self.valid.clear()
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if str(request.url) == self.TOKEN_URL:
+            if self.token_failures:
+                return self._fail(self.token_failures.pop(0))
+            return self._token(request)
+        if self.failures:
+            return self._fail(self.failures.pop(0))
+        if request.method != "GET" or request.url.host != "graph.microsoft.com":
+            return self._error(400, "BadRequest", "Not a call mailroom may make.")
+        token = request.headers.get("authorization", "").removeprefix("Bearer ")
+        if token not in self.valid:
+            return self._error(401, "InvalidAuthenticationToken", "Access token is invalid.")
+        if 'IdType="ImmutableId"' not in request.headers.get("prefer", ""):
+            return self._error(400, "BadRequest", "This fake answers only immutable ids.")
+        path = unquote(request.url.path)
+        if path == "/v1.0/me":
+            return httpx.Response(
+                200, json={"mail": self.mail, "userPrincipalName": self.user_principal_name}
+            )
+        if path == "/v1.0/me/mailFolders/inbox":
+            return httpx.Response(200, json={"id": self.FOLDERS["inbox"], "displayName": "Inbox"})
+        if path in ("/v1.0/me/mailFolders/inbox/messages/delta", self._DELTA_PATH):
+            return self._delta(request)
+        if path.startswith("/v1.0/me/messages/"):
+            return self._message(path.removeprefix("/v1.0/me/messages/"))
+        return self._error(404, "ResourceNotFound", "Resource not found.")
+
+    _DELTA_PATH = "/v1.0/me/mailFolders('inbox')/messages/delta"
+
+    def _fail(self, failure: object) -> httpx.Response:
+        if isinstance(failure, Exception):
+            raise failure
+        assert isinstance(failure, httpx.Response)
+        return failure
+
+    def _token(self, request: httpx.Request) -> httpx.Response:
+        form = dict(httpx.QueryParams(request.content.decode()))
+        expected = {
+            "client_id": self.client_id,
+            "refresh_token": self.refresh_token,
+            "grant_type": "refresh_token",
+            "scope": self.SCOPE,
+        }
+        if request.method != "POST" or form != expected:
+            return httpx.Response(
+                400,
+                json={"error": "invalid_grant", "error_description": "AADSTS70000: Bad grant."},
+            )
+        token = f"access-{len(self.issued) + 1}"
+        self.issued.append(token)
+        self.valid.add(token)
+        self.refresh_token = f"refresh-token-{len(self.issued) + 1}"
+        return httpx.Response(
+            200,
+            json={
+                "token_type": "Bearer",
+                "scope": "https://graph.microsoft.com/Mail.Read",
+                "expires_in": self.expires_in,
+                "access_token": token,
+                "refresh_token": self.refresh_token,
+            },
+        )
+
+    def _delta(self, request: httpx.Request) -> httpx.Response:
+        params = request.url.params
+        size = 10
+        for part in request.headers.get("prefer", "").split(","):
+            name, _, value = part.strip().partition("=")
+            if name == "odata.maxpagesize" and value.isdigit():
+                size = int(value)
+        if "$skiptoken" in params:
+            found = self._pages.get(params["$skiptoken"])
+            if found is None:
+                return self._error(400, "BadRequest", "Unknown skip token.")
+            items, offset, seen = found
+        elif "$deltatoken" in params:
+            seen = int(params["$deltatoken"].removeprefix("d"))
+            if seen < self._oldest:
+                if self.expired_code:
+                    return self._error(400, self.expired_code, "The sync state was not found.")
+                return self._error(410, "SyncStateNotFound", "Resync required.")
+            items, offset = [dict(entry) for entry in self.log[seen:]], 0
+            seen = len(self.log)
+        else:
+            if params.get("changeType") != "created" or not params.get("$filter", "").startswith(
+                "receivedDateTime ge "
+            ):
+                return self._error(400, "BadRequest", "This fake answers created-since rounds.")
+            since = params["$filter"].removeprefix("receivedDateTime ge ")
+            items = [
+                {"id": message_id}
+                for message_id, message in self.messages.items()
+                if message["parentFolderId"] == self.FOLDERS["inbox"]
+                and str(message["receivedDateTime"]) >= since
+            ]
+            offset, seen = 0, len(self.log)
+        page = items[offset : offset + size]
+        body: dict[str, object] = {"value": [self._entry(entry) for entry in page]}
+        base = f"{self.API}/mailFolders('inbox')/messages/delta"
+        if offset + size < len(items):
+            token = f"s{len(self._pages) + 1}"
+            self._pages[token] = (items, offset + size, seen)
+            body["@odata.nextLink"] = f"{base}?$skiptoken={token}"
+        else:
+            body["@odata.deltaLink"] = f"{base}?$deltatoken=d{seen}"
+        return httpx.Response(200, json=body)
+
+    def _entry(self, entry: dict[str, object]) -> dict[str, object]:
+        if "@removed" in entry:
+            return entry
+        message = self.messages[str(entry["id"])]
+        return {
+            "@odata.type": "#microsoft.graph.message",
+            "id": entry["id"],
+            "conversationId": message["conversationId"],
+            "receivedDateTime": message["receivedDateTime"],
+        }
+
+    def _message(self, rest: str) -> httpx.Response:
+        message_id, _, tail = rest.partition("/")
+        message = self.messages.get(message_id)
+        if message is None or tail not in ("", "$value"):
+            return self._error(404, "ErrorItemNotFound", "The specified object was not found.")
+        if tail == "$value":
+            return httpx.Response(
+                200, content=message["raw"], headers={"content-type": "text/plain"}
+            )
+        return httpx.Response(
+            200,
+            json={
+                "id": message_id,
+                "conversationId": message["conversationId"],
+                "parentFolderId": message["parentFolderId"],
+                "receivedDateTime": message["receivedDateTime"],
+                "webLink": message["webLink"],
+            },
+        )
+
+    @staticmethod
+    def _error(status: int, code: str, message: str) -> httpx.Response:
+        return httpx.Response(status, json={"error": {"code": code, "message": message}})

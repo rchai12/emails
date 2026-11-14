@@ -14,9 +14,11 @@ Each provider is read with read-only access, polled every 1 to 2 minutes, and tu
 
 ## live.com
 
-- Microsoft Graph with read-only mail access.
-- New mail is found by polling with delta queries.
-- Register the app for personal Microsoft accounts as well as work accounts.
+- Microsoft Graph with the `Mail.Read` scope (and `offline_access` for a refresh token), over plain REST calls (httpx). Each account has a short name (such as `live`); its client ID and refresh token are Keychain items `outlook.<account>.client-id` and `.refresh-token`. A desktop app is a public client, so there is no client secret.
+- **Personal accounts only.** The app is registered for personal Microsoft accounts (the `consumers` tenant), which covers live.com, outlook.com and hotmail.com (owner's decision, Nov 13, 2026).
+- **Refresh tokens rotate.** Each refresh returns a new refresh token, which replaces the old one in the Keychain (Phase 4a).
+- **New mail** is found by polling the inbox with delta queries (`changeType=created`), with immutable ids so a message keeps its id when moved. A page link is followed only to `graph.microsoft.com`, so the token never goes anywhere else.
+- **Login** (Phase 4c): Microsoft's consent page in your browser, answered on a one-request listener on 127.0.0.1 with PKCE, as for Gmail.
 
 ## Yahoo
 

@@ -20,6 +20,10 @@ Follow `docs/phase-conventions.md`. N is 1090, the tests the previous phase left
 
 Start: `.venv/bin/python -m pytest --no-cov -q --ignore=tests/integration/test_outlook.py` must show `1090 passed`. The ignored file imports `mailroom.outlook`, which you create.
 
+## Corrections
+
+- **2026-11-13, after the first review (FAIL).** `test_a_first_round_reads_the_inbox_since_a_moment_page_by_page` built its days as `f"2026-11-{day}"`, so day 9 was `2026-11-9`. FakeGraph compares `receivedDateTime` as text, and `2026-11-9` sorts after `2026-11-10`, so the fake wrongly counted that message as received since the moment. The given test now writes `f"2026-11-{day:02d}"`. The client was right. All 39 given tests and the probe pass against the committed `outlook.py`, which stays as it is. The coder's remaining work is the Acceptance run and the progress entry.
+
 ## Facts
 
 Each was checked in Microsoft's documentation (Microsoft identity platform: auth code flow, redirect URIs; Microsoft Graph: delta query, messages delta, MIME, immutable ids). Nothing here was checked against a real Microsoft account.

@@ -171,7 +171,7 @@ def test_the_profile_falls_back_to_the_sign_in_name_and_finds_the_inbox(graph: F
 
 def test_a_first_round_reads_the_inbox_since_a_moment_page_by_page(graph: FakeGraph) -> None:
     for number, day in ((1, 9), (2, 10), (3, 11), (4, 12)):
-        graph.add_message(f"AAMk{number}=", RAW, received=f"2026-11-{day}T08:00:00Z")
+        graph.add_message(f"AAMk{number}=", RAW, received=f"2026-11-{day:02d}T08:00:00Z")
     graph.add_message("AAMk5=", RAW, folder="junkemail", received="2026-11-12T09:00:00Z")
     delta = client(graph).first_delta(SINCE)
     assert delta == Delta(

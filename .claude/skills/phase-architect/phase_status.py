@@ -1,7 +1,8 @@
 """Print the facts step 1 of the phase-architect checklist needs, in one short run.
 
-Run it from anywhere: python3.12 .claude/skills/phase-architect/phase_status.py
-(or .venv/bin/python once the environment exists). It only reads; it changes nothing.
+Run from the repository root with:
+.venv/bin/python .claude/skills/phase-architect/phase_status.py
+It only reads; it changes nothing.
 """
 
 import re
@@ -57,6 +58,14 @@ def main() -> int:
     print("== latest progress entry")
     entry = last_entry(ROOT / "docs" / "progress.md")
     print("\n".join(entry))
+    workflow = ROOT / "docs" / "agent-workflow.md"
+    if workflow.is_file():
+        text = workflow.read_text(encoding="utf-8")
+        marker = "## Workflow maintenance evidence:"
+        if marker in text:
+            print("== later workflow maintenance (reconcile the suite baseline)")
+            block = text[text.index(marker) :].split("\n## ", 1)[0]
+            print("\n".join(block.splitlines()[:6]))
     print("== newest review head")
     if reviewed:
         newest = max(reviews.glob("*.md"), key=lambda path: path.stat().st_mtime)

@@ -13,7 +13,7 @@
         MODULE is a file path, `gmail_sync`, or `mailroom.gmail_sync`.
 
     .venv/bin/python .claude/skills/phase-architect/phase_tools.py clone 1h --scratch DIR
-        Make (or remake) DIR/fail01h from the repository with the venv linked, and say whether
+        Make a fresh DIR/fail01h from the repository with the venv linked, and say whether
         `mailroom` imports from the clone.
 
     .venv/bin/python .claude/skills/phase-architect/phase_tools.py failcheck CLONE TEST...
@@ -74,11 +74,15 @@ def run_searches(spec_path: Path, cwd: Path) -> int:
     if not commands:
         print("no ### Searches block")
         return 1
+    failed = False
     for command in commands:
         done = subprocess.run(["zsh", "-c", command], cwd=cwd, capture_output=True, text=True)
         count = len([line for line in done.stdout.splitlines() if line.strip()])
-        print(f"{count:3}  {command[:90]}")
-    return 0
+        error = done.returncode not in (0, 1)
+        failed = failed or error
+        suffix = f" (execution error: exit {done.returncode})" if error else ""
+        print(f"{count:3}  {command[:90]}{suffix}")
+    return int(failed)
 
 
 def plant_and_search(spec_path: Path, cwd: Path, plant: Path) -> int:
@@ -147,10 +151,13 @@ def clone_env() -> dict[str, str]:
 
 def make_clone(phase: str, scratch: Path) -> int:
     dest = scratch.resolve() / f"fail{file_id(phase)}"
-    if dest.exists():
-        shutil.rmtree(dest)
+    if dest.exists() or dest.is_symlink():
+        print(f"refusing existing clone: {dest}; choose a fresh scratch directory")
+        return 1
     subprocess.run(["git", "clone", "-q", str(ROOT), str(dest)], check=True)
     (dest / ".venv").symlink_to(ROOT / ".venv")
+    with (dest / ".git/info/exclude").open("a", encoding="utf-8") as handle:
+        handle.write("\n/.venv\n")
     found = subprocess.run(
         [".venv/bin/python", "-c", "import mailroom; print(mailroom.__file__)"],
         cwd=dest,

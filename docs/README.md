@@ -8,6 +8,7 @@ The email service watches Gmail, live.com and yahoo.com, finds messages that nee
 
 | Doc | What it covers |
 | --- | --- |
+| [AI development workflow](agent-workflow.md) | Architect, coder and independent verifier roles, local skills, tools and handoff prompts |
 | [Purpose and scope](purpose-and-scope.md) | What the service is for, and what v1 includes and leaves out |
 | [Decisions](decisions.md) | Every major decision, with the reason and the option rejected |
 | [Architecture](architecture.md) | Components, data flow and the normalized message record |
@@ -19,5 +20,6 @@ The email service watches Gmail, live.com and yahoo.com, finds messages that nee
 | [Roadmap](roadmap.md) | Build order, acceptance tests and deferred items |
 | [Open questions](open-questions.md) | Decisions still to make before building |
 | [Phase 1 audit](phase-01-audit.md) | Alignment, file size, duplication, and residual risk after Phases 0 to 1m |
+| [Codebase audit](codebase-audit.md) | Duplication, file size, risks, and maintainability through Phase 4d |
 
 The original single document is kept in [archive/](archive/Email%20Service%20Feature%20Decisions.md) for reference. These docs replace it.

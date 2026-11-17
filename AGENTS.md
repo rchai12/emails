@@ -2,6 +2,27 @@
 
 This file applies to every phase. Read it, then `docs/architecture.md`, then `docs/testing.md`, then `docs/phase-conventions.md` (what every phase spec and guide assume), then the phase spec you were assigned.
 
+## AI roles and workflow
+
+Use the project-local skill for the assigned role:
+
+| Role | Skill | Deliverable |
+| --- | --- | --- |
+| Architect | `.agents/skills/phase-architect/SKILL.md` | Validated phase spec, given files, verification guide and handoff |
+| Coder | `.agents/skills/phase-coder/SKILL.md` | One phase's implementation, acceptance evidence and progress entry |
+| Independent verifier | `.agents/skills/phase-verifier/SKILL.md` | Review of the coder's exact diff; only the report is edited |
+
+Keep these roles separate. A coder does not read the verification guide or write
+their own review. Verification belongs to another agent in a fresh session.
+Do not launch another agent or the next phase without an assignment.
+Claude entry points under `.claude/skills/` use the same canonical instructions.
+See `docs/agent-workflow.md` for tools and handoff prompts.
+
+The clean-tree and committed-spec prerequisites in `docs/phase-conventions.md`
+apply to phase implementation. For an explicitly assigned documentation or
+workflow maintenance task, inspect status first and preserve unrelated changes;
+do not invent a product phase or append a fictitious phase progress entry.
+
 ## Scope discipline
 
 - Implement **only** the phase you were assigned. Do not build features from later phases, even if it seems convenient.

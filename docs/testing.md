@@ -56,6 +56,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 .venv/bin/python scripts/check.py                   # lint, format, tests with coverage, critical coverage
 .venv/bin/python scripts/check.py --first core      # the core section first; the full check only once it passes
 .venv/bin/python scripts/check.py --section tooling # one section alone, no coverage (names in tests/sections.toml)
+.venv/bin/python scripts/check.py --first tooling --quiet # same full gates; compact output and full temporary logs
 .venv/bin/python -m pytest                          # the tests alone, with coverage
 ```
 

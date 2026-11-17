@@ -8,6 +8,11 @@ A phase id is a number with an optional letter: `0`, `1`, `1a`, `12b`. Files use
 
 ## For the coder
 
+Use `.agents/skills/phase-coder/SKILL.md`. The coder and verifier are separate
+agents in fresh sessions. Do not read the verification guide or review reports;
+run the probe only by the path Acceptance names. Use findings explicitly handed
+back to you for a correction. See `docs/agent-workflow.md` for tooling and handoff.
+
 ### Before you start
 
 - The spec and its given files are committed and the tree is clean: `git status --short` prints nothing. If it prints anything, stop before writing any code and report the paths it lists; do not work around it.
@@ -54,6 +59,15 @@ Unless the spec adds more, run before you report:
 
 Add an entry at the end of `docs/progress.md` in exactly this form. Every field is one line, or `None`; the architect reads these fields instead of your final message, so keep them short and literal. `scripts/check_reports.py` checks this form: the fields in this order, each list with at least one `  - ` line, and nothing else in the entry.
 
+Use `.venv/bin/python scripts/progress.py --help` to write the entry with actual
+counts. For a correction, `--replace` updates only that phase and requires an
+existing entry; record the correction in Deviations/Follow-ups, and retain the
+failed-run history in the architect's history and spec's Corrections section.
+If stopped, make the first Follow-ups item
+`Stopped: <requirement/gate> | <observation> | <what permits completion>`; never
+invent a completed run's test count. A stop before any meaningful test run can
+be reported directly without a fabricated progress entry.
+
 ```markdown
 ## Phase <id>: <the spec's title> (YYYY-MM-DD)
 - Tests: <N> -> <passed after> (given <the spec's given count>)
@@ -69,13 +83,18 @@ In your final message give the `Sections:` table and the last ten lines of `scri
 
 ## For the verifier
 
+Use `.agents/skills/phase-verifier/SKILL.md` in a fresh session separate from the
+coder. Check whether the coder ran and the baseline is committed before expensive
+gates. Report missing implementation, a stopped coder, an environment problem or
+a mixed baseline separately from functional findings. Never waive a literal gate.
+
 - Do not modify any file in the repository, except to write your report (below). Report findings only. The work under review is uncommitted: "the diff" is `git status --short` plus `git diff HEAD` plus the untracked files, read before you write the report.
 - Run the guide's gates exactly as written, from the repository root. The first gate is `scripts/check.py --first <the spec's sections>`; if a section fails, report it with the table's rerun command.
 - **Scope audit**: `git status --short` shows only the spec's Scope paths; `git diff HEAD --stat -- <the given files>` prints nothing; no existing test or unlisted module changed.
 - **The probe.** From Phase 1b on it is the given file `docs/verification/probe-<NNx>.py`: run it from the repository root with `.venv/bin/python docs/verification/probe-<NNx>.py`, without editing it. In Phases 0 and 1a it is embedded in the guide: save it outside the repository, run it from the repository root, and delete it afterwards. Every line must end in `ok`; the last line must be `FAILURES 0`.
 - Judge code by what it does, never by resemblance to another way of writing it.
 - **Coverage reached the wrong way is a finding**: a test that runs a line but asserts nothing about what it does, a `# pragma: no cover` the spec did not allow, or code the spec requires removed to close a gap.
-- **Spot checks**: for each row of the guide's spot-check table, copy the module outside the repository first, make the named one-line change, run the deciding test, and confirm it fails; then restore the file from your copy (never with `git checkout` or `git restore`), clear `__pycache__`, and confirm `git diff` is as before.
+- **Spot checks**: for each row, make a disposable scratch copy of the scoped implementation and tests, link the existing venv, set `PYTHONPATH=src:.`, and verify that `mailroom.__file__` is inside that copy. Run the named mutation and deciding test there, never in the implementation under review. Compare original bytes and status before and after. This also applies to older guides that describe an in-place edit/restore. A different failure needs investigation; a passing mutation may reveal a weak test rather than a product defect.
 - **Real systems**: like the coder, never connect to a real mail provider, Discord, the tasks app or the local model, and never read the Keychain.
 
 ### Report and verdict

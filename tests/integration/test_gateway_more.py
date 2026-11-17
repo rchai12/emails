@@ -203,13 +203,11 @@ def test_a_closed_identify_reconnects_without_a_session(
     assert gateway.connections[1].sent[0][1] == IDENTIFY
 
 
-def test_a_bad_frame_and_an_unknown_op_are_ignored(
-    gateway: FakeGateway, store: Store, settings: Settings
-) -> None:
+def test_an_unknown_op_is_ignored(gateway: FakeGateway, store: Store, settings: Settings) -> None:
     class Noise:
         def __init__(self, inner: object) -> None:
             self.inner = inner
-            self.pending = ["{", '{"op": 99, "d": null}']
+            self.pending = ['{"op": 99, "d": null}']
             self.saw_hello = False
 
         def recv(self, timeout: float | None = None) -> str:

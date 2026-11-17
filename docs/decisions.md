@@ -64,3 +64,11 @@ An email becomes a task only after your approval on Discord, and the service hol
 | Microsoft sign-in | Browser consent with PKCE on a 127.0.0.1 listener, as for Gmail | Reuses the tested Gmail login; no code to type | Device code flow |
 | Busy hours | No cap; above 20 notifications an hour, batch into digests every 15 minutes, ranked most to least important | Missing an important email is a bigger risk than a flood | An hourly cap that holds emails back |
 | Restarts | launchd LaunchAgent, plus the email subagent reporting on Discord when it can't reach the service | Built into macOS and restarts within seconds | The orchestrator AI restarting the process (slow to notice, needs process control) |
+
+## Phase 4e input recovery (2026-11-17)
+
+The owner selected both recommended options in the architect's multiple-choice
+questions: malformed Gateway frames reconnect through the existing resume/backoff
+path; malformed interaction bodies with valid callback addressing are safely
+acknowledged and ignored without state changes. Unknown interaction kinds or
+unaddressable callbacks are ignored without HTTP, as specified in Phase 4e.

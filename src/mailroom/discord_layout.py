@@ -80,6 +80,7 @@ FULL_CUT_NOTE = "The email is longer than Discord allows; use Open email to read
 FULL_EMPTY = "(no text)"
 FULL_EXPIRED = "The email text was deleted after 24 hours; use Open email to read it."
 ALREADY_TEXT = "This email is already answered."
+BUSY_TEXT = "Mailroom is busy right now. Press again in a moment."
 NO_SENDER_TEXT = "This email has no sender address."
 TRUSTED_REPLY = "Added to your trusted senders:"
 BAD_TITLE_TEXT = "A title needs 1 to 100 characters on one line."
@@ -160,6 +161,11 @@ ALERT_LISTENER = (
     "buttons and commands may not answer until it does."
 )
 ALERT_LISTENER_FIXED = "The Discord listener is answering again."
+ALERT_STORE_BUSY = (
+    "Mailroom's database has been locked by another program for 15 minutes, so mail checks "
+    "are being skipped. Close whatever has it open; checks resume on their own."
+)
+ALERT_STORE_FIXED = "Mailroom's database is free again. Mail checks have resumed."
 ALERT_MODEL = (
     "The local model has been unreachable for 15 minutes. New mail is waiting; nothing is lost."
 )

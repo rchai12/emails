@@ -83,3 +83,17 @@ none). It restarts forever, waiting 1, 2, 4, 8, 16, 32 and then 60 seconds, and
 the wait resets once a listener survives a full poll round (rather than giving up
 after 10). A missing bot token stays terminal, while an unavailable Keychain is
 retried (rather than treating both as terminal).
+
+## Phase 4g SQLite contention (2026-11-21)
+
+The owner selected the recommended option in each of the architect's three
+multiple-choice questions. A press or command that meets a locked database gets a
+private "Mailroom is busy right now. Press again in a moment." reply, and the card
+is left as it is (rather than no answer, or a wait long enough to miss Discord's
+3 seconds). A poll round that meets the lock is skipped with a status line and
+retried next round, and the owner is pinged only after 15 minutes of continuous
+locking, then told once it is free (rather than a ping at once, or never). The
+listener's store waits 1.5 seconds for a lock and the poll loop's 10 seconds
+(rather than one shared wait). Because a locked database cannot store an alert, that
+ping is posted directly with one nonce per episode, while the "free again" notice
+uses the alert queue. WAL is not adopted.

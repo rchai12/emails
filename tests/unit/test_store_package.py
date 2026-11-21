@@ -12,6 +12,7 @@ AREAS = ("base", "messages", "sync", "senders", "triage", "posts", "alerts", "ap
 
 METHODS = {
     "close": "base",
+    "set_lock_wait": "base",
     "add": "messages",
     "get": "messages",
     "clear_expired_text": "messages",

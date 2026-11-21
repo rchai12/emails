@@ -263,3 +263,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - A kind 2 interaction with no name key stays ignored with no callback (earlier test_a_slash_command_is_left_for_later pins it); only a present non-string name gets the private reply.
 - Follow-ups:
   - None
+
+## Phase 4f: Supervise listener recovery (2026-11-21)
+- Tests: 1337 -> 1364 (given 20)
+- New public names: service: RESTART_SECONDS, LISTENER_WAIT
+- Changed files: 3
+- Deviations:
+  - A terminal-kind error raised while opening the store or client is treated as recoverable, since only an attempt's gateway call is classified terminal.
+- Follow-ups:
+  - None

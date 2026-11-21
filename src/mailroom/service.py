@@ -25,11 +25,13 @@ from mailroom.extractor import ModelUnavailable
 from mailroom.gateway import GatewayStopped, run_gateway
 from mailroom.gmail import GmailAuthError, GmailClient, GmailError
 from mailroom.gmail_sync import SyncResult
-from mailroom.keychain import KeychainError
+from mailroom.keychain import KeychainError, KeychainUnavailable, SecretMissing
 from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError
 from mailroom.store import Store, open_store
 from mailroom.tasks_app import TasksUnavailable
 
+RESTART_SECONDS = (1, 2, 4, 8, 16, 32, 60)
+LISTENER_WAIT = timedelta(minutes=15)
 _ACCOUNTS = "MAILROOM_GMAIL_ACCOUNTS or MAILROOM_OUTLOOK_ACCOUNTS"
 _REQUIRED = (
     ("extractor_model", "MAILROOM_EXTRACTOR_MODEL"),
@@ -105,6 +107,7 @@ def run_service(
     open_discord_http: Callable[[], httpx.Client] = discord_post.open_discord_http,
     open_tasks_http: Callable[[], httpx.Client] = tasks_app.open_tasks_http,
     gateway: Callable[..., None] = run_gateway,
+    restart_wait: Callable[[float], bool] | None = None,
 ) -> None:
     missing = []
     if settings.gmail_accounts == () and settings.outlook_accounts == ():
@@ -126,19 +129,24 @@ def run_service(
     discord_http = open_discord_http()
     tasks_http = open_tasks_http()
     health.report("discord gateway", "running")
-    thread = threading.Thread(
-        target=_listen,
-        name="mailroom-gateway",
-        args=(settings, health, stop, open_discord_http, gateway),
-        daemon=True,
+    listener = _Listener(
+        settings, health, stop, open_discord_http, gateway, restart_wait or stop.wait
     )
+    thread = threading.Thread(target=listener.run, name="mailroom-gateway", daemon=True)
     thread.start()
     try:
         first = True
+        previous = 0
         while not stop.is_set():
+            failures, running, reason = listener.snapshot()
             if not first and thread.is_alive():
                 _gateway(store, False, "")
+                healthy = failures == previous and running
+                if healthy:
+                    listener.reset()
+                _listener_alert(store, not healthy, reason)
             first = False
+            previous = failures
             run_round(store, settings, mail_clients, model_http, discord_http, tasks_http, health)
             stop.wait(settings.poll_seconds)
     finally:
@@ -147,28 +155,97 @@ def run_service(
         _close(store, mail_clients, model_http, discord_http, tasks_http)
 
 
-def _listen(
-    settings: Settings,
-    health: Health,
-    stop: threading.Event,
-    open_discord_http: Callable[[], httpx.Client],
-    gateway: Callable[..., None],
-) -> None:
-    store = open_store(settings)
-    http = open_discord_http()
-    try:
-        gateway(store, settings, http, stop=stop.is_set)
-    except (GatewayStopped, DiscordUnavailable, KeychainError) as error:
-        state = str(error)
-        health.report("discord gateway", state)
-        _gateway(store, True, state)
-    except Exception as error:
-        state = f"failed ({type(error).__name__})"
-        health.report("discord gateway", state)
-        _gateway(store, True, state)
-    finally:
-        http.close()
-        store.close()
+class _Listener:
+    """Runs the Discord listener on one thread, restarting it after a recoverable failure."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        health: Health,
+        stop: threading.Event,
+        open_discord_http: Callable[[], httpx.Client],
+        gateway: Callable[..., None],
+        wait: Callable[[float], bool],
+    ) -> None:
+        self._settings = settings
+        self._health = health
+        self._stop = stop
+        self._open_http = open_discord_http
+        self._gateway = gateway
+        self._wait = wait
+        self._lock = threading.Lock()
+        self._failures = 0
+        self._streak = 0
+        self._running = False
+        self._reason = ""
+
+    def snapshot(self) -> tuple[int, bool, str]:
+        with self._lock:
+            return self._failures, self._running, self._reason
+
+    def reset(self) -> None:
+        with self._lock:
+            self._streak = 0
+
+    def run(self) -> None:
+        while not self._stop.is_set():
+            self._health.report("discord gateway", "running")
+            reason = self._attempt()
+            if reason is None:
+                return
+            with self._lock:
+                self._failures += 1
+                self._streak += 1
+                self._reason = reason
+                delay = RESTART_SECONDS[min(self._streak - 1, 6)]
+            self._health.report("discord gateway", reason)
+            if self._wait(delay):
+                return
+
+    def _attempt(self) -> str | None:
+        """Run one attempt; return the recoverable reason, or None to stop for good."""
+        held: list[Store | httpx.Client] = []
+        try:
+            store = open_store(self._settings)
+            held.append(store)
+            http = self._open_http()
+            held.append(http)
+            with self._lock:
+                self._running = True
+            self._gateway(store, self._settings, http, stop=self._stop.is_set)
+        except (GatewayStopped, DiscordUnavailable, SecretMissing) as error:
+            if len(held) < 2:
+                return _reason(error)
+            state = str(error)
+            self._health.report("discord gateway", state)
+            _gateway(store, True, state)
+            return None
+        except Exception as error:
+            return _reason(error)
+        finally:
+            with self._lock:
+                self._running = False
+            for resource in reversed(held):
+                resource.close()
+        return None if self._stop.is_set() else "ended"
+
+
+def _reason(error: Exception) -> str:
+    if isinstance(error, KeychainUnavailable):
+        return str(error)
+    return f"failed ({type(error).__name__})"
+
+
+def _listener_alert(store: Store, failing: bool, reason: str) -> None:
+    alerts.track(
+        store,
+        "listener",
+        failing,
+        wait=LISTENER_WAIT,
+        raised=L.ALERT_LISTENER.format(reason=reason),
+        ping=True,
+        resolved=L.ALERT_LISTENER_FIXED,
+    )
 
 
 def _status(health: Health, part: str, call: Callable[[], PostReport]) -> PostReport | None:

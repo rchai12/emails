@@ -63,3 +63,13 @@ implementation was produced; prior audit mapping and build priority preserved.
 | Phase | Planned contract | Validation/result |
 | --- | --- | --- |
 | 4e | Validate Gateway input: owner chose reconnect/backoff for malformed frames and safe acknowledgement for malformed interaction bodies; opaque callback tokens are escaped, not guessed from an alphabet. Spec and guide at docs/{phases,verification}/phase-04e-gateway-input.md. 68 new cases from 12 functions plus 15 existing guard cases in the architect-edited test_gateway_more.py; source predecessor 06a5fbaf5f87bcf22e738bcb0629990f01f6427d, current N 1230. | Specified; result pending. Given fail-check: 62 failed / 21 passed (6 new guards, 15 earlier guards); no feature implementation. Start 1230 passed. Probe oracle-only passes; predecessor reaches FAILURES 1 across 96 forced invalid shapes. Search gates silent on source and detect planted violations; lint/format and guide test-id/count checks passed. Final planning/given-file commit is required before coder handoff; no commit made. |
+
+## Phase 4e correction (2026-11-21)
+
+Coder reported 1337 passed (given 83), probe FAILURES 0, and one deviation: Requirement 5
+required a string kind 2 `name`, but the unchangeable earlier
+test_a_slash_command_is_left_for_later expects a nameless kind 2 event to be ignored with
+no callback. My spec defect: I checked option names against existing tests but not the
+command name. Owner approved the coder's behavior (absent = ignored, present non-string =
+private reply); dated Corrections section added to the spec. Rechecked on the coder's code:
+84 passed (given plus that earlier test), probe FAILURES 0. Result pending verifier review.

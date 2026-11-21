@@ -18,6 +18,22 @@ Start: `.venv/bin/python -m pytest --no-cov -q --ignore=tests/integration/test_g
 must show `1230 passed`. Nothing needs a missing-module stub. The new given file
 already imports successfully and is excluded because its behavior is unbuilt.
 
+## Corrections
+
+- **2026-11-21, after implementation, before review (owner-approved).** Requirement 5's
+  "Kind 2 needs string name" contradicted the earlier
+  `tests/integration/test_interactions.py::test_a_slash_command_is_left_for_later`,
+  which this phase may not change: it sends a kind 2 event whose data has no `name`
+  key and expects `ignored` with no request. The coder kept that test passing and
+  recorded it as a deviation. The owner approved that behavior, so it is now the
+  contract: in kind 2 data, `name` may be absent (then `ignored`, no callback, no
+  store access, as before); when present it must be a string, and a present
+  non-string name gets Requirement 6's private constant reply. The same "absent
+  or string" rule already applied to option names. Against the coder's uncommitted
+  `gateway.py` and `interactions.py`, which stay as they are: the 83 given tests and
+  the earlier test pass, and the probe prints `FAILURES 0`. The progress entry's
+  deviation is approved by this correction; no code or test change follows.
+
 ## Facts
 
 - Today's `_read_hello` indexes decoded JSON without shape validation; `_loop`

@@ -1,4 +1,5 @@
 import unicodedata
+import urllib.parse
 from datetime import date
 from zoneinfo import ZoneInfo
 
@@ -33,6 +34,8 @@ _SECOND_ACTIONS = frozenset({"approve", "change", "nodeadline", "drop"})
 _FORM_ACTIONS = frozenset({L.FORM_ACTION, L.TASK_FORM_ACTION})
 _BAD_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
 _COMMAND_NAMES = tuple(command["name"] for command in L.COMMANDS)
+_KINDS = (2, 3, 5)
+_UNAVAILABLE = "This interaction is unavailable."
 
 
 def handle_interaction(
@@ -40,7 +43,17 @@ def handle_interaction(
 ) -> str:
     if settings.discord_owner_id == "" or settings.discord_channel_id == "":
         raise DiscordUnavailable("not configured") from None
-    kind = event["type"]
+    if type(event) is not dict:
+        return "ignored"
+    kind = event.get("type")
+    if type(kind) is not int or kind not in _KINDS or not _addressable(event):
+        return "ignored"
+    if not _well_formed(event, kind):
+        if kind == 2:
+            _send(http, event, _private(_UNAVAILABLE))
+        else:
+            _send(http, event, {"type": L.DEFERRED_UPDATE})
+        return "ignored"
     if kind == 2:
         answered = _slash(event, store, settings, http)
         if answered is not None:
@@ -89,6 +102,64 @@ def handle_interaction(
     return "already"
 
 
+def _text(value: object) -> bool:
+    return type(value) is str and value != ""
+
+
+def _addressable(event: dict[str, object]) -> bool:
+    identifier = event.get("id")
+    token = event.get("token")
+    if type(identifier) is not str or not 1 <= len(identifier) <= 20:
+        return False
+    if not (identifier.isascii() and identifier.isdigit()) or not _text(token):
+        return False
+    try:
+        token.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _well_formed(event: dict[str, object], kind: int) -> bool:
+    data = event.get("data")
+    if type(data) is not dict or not _text(event.get("channel_id")):
+        return False
+    holder = event["member"] if "member" in event else event
+    if type(holder) is not dict or type(holder.get("user")) is not dict:
+        return False
+    if not _text(holder["user"].get("id")):
+        return False
+    if kind == 2:
+        return _command_shape(data)
+    if type(data.get("custom_id")) is not str:
+        return False
+    return kind == 3 or _form_shape(data)
+
+
+def _command_shape(data: dict[str, object]) -> bool:
+    options = data.get("options")
+    if type(data.get("name", "")) is not str:
+        return False
+    if options is None:
+        return True
+    if type(options) is not list:
+        return False
+    return all(type(option) is dict and type(option.get("name", "")) is str for option in options)
+
+
+def _form_shape(data: dict[str, object]) -> bool:
+    labels = data.get("components")
+    if type(labels) is not list:
+        return False
+    for label in labels:
+        field = label.get("component") if type(label) is dict else None
+        if type(field) is not dict:
+            return False
+        if type(field.get("custom_id")) is not str or type(field.get("value")) is not str:
+            return False
+    return True
+
+
 def _slash(
     event: dict[str, object], store: Store, settings: Settings, http: httpx.Client
 ) -> str | None:
@@ -122,7 +193,7 @@ def _button(event: dict[str, object]) -> tuple[str, str]:
 def _send(http: httpx.Client, event: dict[str, object], payload: dict[str, object]) -> None:
     try:
         response = http.post(
-            f"{L.API_URL}/interactions/{event['id']}/{event['token']}/callback",
+            f"{L.API_URL}/interactions/{event['id']}/{_segment(event['token'])}/callback",
             json=payload,
             headers={"User-Agent": L.USER_AGENT.format(version=__version__)},
         )
@@ -130,6 +201,10 @@ def _send(http: httpx.Client, event: dict[str, object], payload: dict[str, objec
         raise DiscordUnavailable("network") from None
     if response.status_code != 204:
         raise DiscordUnavailable(str(response.status_code)) from None
+
+
+def _segment(token: object) -> str:
+    return urllib.parse.quote(str(token), safe="")
 
 
 def _private(content: str) -> dict[str, object]:

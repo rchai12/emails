@@ -254,3 +254,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - git status also lists the uncommitted header-row correction, the spec's Corrections section, the architect notes, and the review.
+
+## Phase 4e: Validate Gateway input (2026-11-21)
+- Tests: 1230 -> 1337 (given 83)
+- New public names: None
+- Changed files: 5
+- Deviations:
+  - A kind 2 interaction with no name key stays ignored with no callback (earlier test_a_slash_command_is_left_for_later pins it); only a present non-string name gets the private reply.
+- Follow-ups:
+  - None

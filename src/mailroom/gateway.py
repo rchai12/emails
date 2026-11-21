@@ -126,9 +126,9 @@ def _session(
     stop: Callable[[], bool],
     rng: random.Random,
 ) -> str:
-    opened = _read_hello(connection)
-    if opened is None:
-        return "resume"
+    opened = _read_hello(connection, state)
+    if isinstance(opened, str):
+        return opened
     interval_ms, arrived = opened
     if state.resume_at is None:
         state.seq = None
@@ -147,18 +147,64 @@ def _session(
     return _loop(connection, state, store, settings, http, stop, rng, interval_ms, arrived)
 
 
-def _read_hello(connection: Any) -> tuple[float, datetime] | None:
+def _read_hello(connection: Any, state: _Live) -> tuple[float, datetime] | str:
     deadline = clock.now() + timedelta(seconds=P.OPEN_TIMEOUT_SECONDS)
     while True:
         remaining = (deadline - clock.now()).total_seconds()
         if remaining <= 0:
             connection.close(P.RESUME_CLOSE)
-            return None
+            return "resume"
         try:
             raw = connection.recv(timeout=min(remaining, P.POLL_SECONDS))
         except TimeoutError:
             continue
-        return json.loads(raw)["d"]["heartbeat_interval"], clock.now()
+        except websockets.exceptions.ConnectionClosed:
+            return _after_close(connection, state)
+        arrived = clock.now()
+        interval = _hello_interval(_decode(raw), arrived)
+        if interval is None:
+            connection.close(P.RESUME_CLOSE)
+            return "resume"
+        return interval, arrived
+
+
+def _is_count(value: object) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _decode(raw: str | bytes) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(raw)
+    except (ValueError, RecursionError):
+        return None
+    if type(payload) is not dict:
+        return None
+    op = payload.get("op")
+    sequence = payload.get("s")
+    name = payload.get("t")
+    if not _is_count(op):
+        return None
+    if op == P.DISPATCH:
+        if not _is_count(sequence) or type(name) is not str or name == "":
+            return None
+        if type(payload.get("d")) is not dict:
+            return None
+    elif sequence is not None or name is not None:
+        return None
+    return payload
+
+
+def _hello_interval(payload: dict[str, Any] | None, arrived: datetime) -> float | None:
+    if payload is None or payload["op"] != P.HELLO or type(payload.get("d")) is not dict:
+        return None
+    interval = payload["d"].get("heartbeat_interval")
+    if type(interval) not in (int, float):
+        return None
+    try:
+        first = arrived + timedelta(milliseconds=interval)
+    except (OverflowError, ValueError):
+        return None
+    return interval if first > arrived else None
 
 
 def _loop(
@@ -198,10 +244,10 @@ def _loop(
         except websockets.exceptions.ConnectionClosed:
             return _after_close(connection, state)
         seen = True
-        try:
-            payload = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
+        payload = _decode(raw)
+        if payload is None:
+            connection.close(P.RESUME_CLOSE)
+            return "resume"
         action, awaiting = _frame(payload, connection, state, store, settings, http, awaiting)
         if action is not None:
             return action
@@ -216,11 +262,12 @@ def _frame(
     http: httpx.Client,
     awaiting: bool,
 ) -> tuple[str | None, bool]:
-    sequence = payload.get("s")
-    if sequence is not None:
-        state.seq = sequence
-    op = payload.get("op")
+    op = payload["op"]
     if op == P.DISPATCH:
+        if not _ready_shape(payload):
+            connection.close(P.RESUME_CLOSE)
+            return "resume", awaiting
+        state.seq = payload["s"]
         _dispatch(payload, state, store, settings, http)
         return None, awaiting
     if op == P.HEARTBEAT:
@@ -232,11 +279,21 @@ def _frame(
         return "resume", awaiting
     if op == P.INVALID_SESSION:
         connection.close(P.RESUME_CLOSE)
-        if payload.get("d") is True:
+        if type(payload.get("d")) is not bool or payload["d"]:
             return "resume", awaiting
         state.forget()
         return "ended", awaiting
     return None, awaiting
+
+
+def _ready_shape(payload: dict[str, Any]) -> bool:
+    if payload["t"] != "READY":
+        return True
+    data = payload["d"]
+    return all(
+        type(data.get(key)) is str and data[key] != ""
+        for key in ("session_id", "resume_gateway_url")
+    )
 
 
 def _dispatch(
@@ -246,7 +303,7 @@ def _dispatch(
     if name == "READY":
         state.tries = 0
         data = payload["d"]
-        resume_at = str(data["resume_gateway_url"]).rstrip("/") + "/" + P.QUERY
+        resume_at = data["resume_gateway_url"].rstrip("/") + "/" + P.QUERY
         if gateway_url_allowed(resume_at):
             state.session_id = data["session_id"]
             state.resume_at = resume_at

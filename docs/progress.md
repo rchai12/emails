@@ -272,3 +272,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - A terminal-kind error raised while opening the store or client is treated as recoverable, since only an attempt's gateway call is classified terminal.
 - Follow-ups:
   - None
+
+## Phase 4g: Bound SQLite contention (2026-11-21)
+- Tests: 1364 -> 1413 (given 44)
+- New public names: store: is_busy; service: POLL_LOCK_SECONDS, LISTENER_LOCK_SECONDS, STORE_WAIT; Store: set_lock_wait
+- Changed files: 7
+- Deviations:
+  - None
+- Follow-ups:
+  - None

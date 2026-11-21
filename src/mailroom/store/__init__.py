@@ -3,7 +3,7 @@ from mailroom.store.alerts import Alert, Problem
 from mailroom.store.alerts import AlertStore as _AlertStore
 from mailroom.store.approvals import Approval
 from mailroom.store.approvals import ApprovalStore as _ApprovalStore
-from mailroom.store.base import DB_FILENAME, SCHEMA_MESSAGE, StoreError
+from mailroom.store.base import DB_FILENAME, SCHEMA_MESSAGE, StoreError, is_busy
 from mailroom.store.messages import TEXT_RETENTION, StoredMessage
 from mailroom.store.messages import MessageStore as _MessageStore
 from mailroom.store.posts import Answer, Post
@@ -37,6 +37,7 @@ __all__ = [
     "SyncState",
     "Task",
     "Verdict",
+    "is_busy",
     "open_store",
 ]
 

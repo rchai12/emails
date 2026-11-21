@@ -14,6 +14,13 @@ class StoreError(Exception):
     pass
 
 
+def is_busy(error: BaseException) -> bool:
+    if not isinstance(error, sqlite3.OperationalError):
+        return False
+    code = getattr(error, "sqlite_errorcode", None)
+    return isinstance(code, int) and code & 0xFF in (5, 6)
+
+
 class StoreBase:
     def __init__(self, path: Path) -> None:
         self._connection = sqlite3.connect(path)
@@ -30,6 +37,9 @@ class StoreBase:
             pragma = f"PRAGMA user_version = {index + 1};"
             script = "BEGIN;\n" + MIGRATIONS[index] + "\n" + pragma + "\nCOMMIT;"
             self._connection.executescript(script)
+
+    def set_lock_wait(self, seconds: float) -> None:
+        self._connection.execute(f"PRAGMA busy_timeout = {round(seconds * 1000)}")
 
     def close(self) -> None:
         self._connection.close()
@@ -48,7 +58,11 @@ class StoreBase:
             self._connection.rollback()
             raise
         else:
-            self._connection.commit()
+            try:
+                self._connection.commit()
+            except BaseException:
+                self._connection.rollback()
+                raise
 
     @staticmethod
     def _stamp(moment: datetime) -> str:

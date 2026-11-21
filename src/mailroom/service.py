@@ -1,8 +1,10 @@
 """One process that polls mail and listens for Discord presses."""
 
+import sqlite3
 import threading
 from collections.abc import Callable, Sequence
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -13,6 +15,7 @@ from mailroom import (
     extractor,
     gmail,
     gmail_sync,
+    ids,
     outlook,
     outlook_sync,
     tasks_app,
@@ -27,11 +30,14 @@ from mailroom.gmail import GmailAuthError, GmailClient, GmailError
 from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError, KeychainUnavailable, SecretMissing
 from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError
-from mailroom.store import Store, open_store
+from mailroom.store import Store, is_busy, open_store
 from mailroom.tasks_app import TasksUnavailable
 
 RESTART_SECONDS = (1, 2, 4, 8, 16, 32, 60)
 LISTENER_WAIT = timedelta(minutes=15)
+POLL_LOCK_SECONDS = 10.0
+LISTENER_LOCK_SECONDS = 1.5
+STORE_WAIT = timedelta(minutes=15)
 _ACCOUNTS = "MAILROOM_GMAIL_ACCOUNTS or MAILROOM_OUTLOOK_ACCOUNTS"
 _REQUIRED = (
     ("extractor_model", "MAILROOM_EXTRACTOR_MODEL"),
@@ -121,6 +127,7 @@ def run_service(
         raise ServiceError("not configured: " + ", ".join(missing))
     health = Health(say)
     store = open_store(settings)
+    store.set_lock_wait(POLL_LOCK_SECONDS)
     mail_clients: list[GmailClient | OutlookClient] = [
         open_gmail(account) for account in settings.gmail_accounts
     ]
@@ -137,22 +144,72 @@ def run_service(
     try:
         first = True
         previous = 0
+        episode: _Episode | None = None
         while not stop.is_set():
             failures, running, reason = listener.snapshot()
-            if not first and thread.is_alive():
-                _gateway(store, False, "")
-                healthy = failures == previous and running
-                if healthy:
-                    listener.reset()
-                _listener_alert(store, not healthy, reason)
-            first = False
-            previous = failures
-            run_round(store, settings, mail_clients, model_http, discord_http, tasks_http, health)
+            was, previous = previous, failures
+            try:
+                if not first and thread.is_alive():
+                    _gateway(store, False, "")
+                    healthy = failures == was and running
+                    if healthy:
+                        listener.reset()
+                    _listener_alert(store, not healthy, reason)
+                first = False
+                run_round(
+                    store, settings, mail_clients, model_http, discord_http, tasks_http, health
+                )
+                episode = _end_episode(store, health, episode)
+            except sqlite3.OperationalError as error:
+                if not is_busy(error):
+                    raise
+                health.report("store", "busy")
+                episode = _busy_round(settings, discord_http, episode)
             stop.wait(settings.poll_seconds)
     finally:
         stop.set()
         thread.join(10)
         _close(store, mail_clients, model_http, discord_http, tasks_http)
+
+
+@dataclass
+class _Episode:
+    since: datetime
+    nonce: str
+    pinged: bool = False
+
+
+def _end_episode(store: Store, health: Health, episode: _Episode | None) -> None:
+    if episode is None:
+        return None
+    if episode.pinged:
+        alerts.notice(store, f"store:{episode.since.isoformat()}:resolved", L.ALERT_STORE_FIXED)
+    health.report("store", "ok")
+    return None
+
+
+def _busy_round(settings: Settings, http: httpx.Client, episode: _Episode | None) -> _Episode:
+    if episode is None:
+        episode = _Episode(clock.now(), ids.new_id()[:25])
+    if not episode.pinged and clock.now() - episode.since >= STORE_WAIT:
+        owner = settings.discord_owner_id
+
+        def body(_: _Episode) -> dict[str, object]:
+            return {
+                "content": f"<@{owner}> {L.ALERT_STORE_BUSY}",
+                "allowed_mentions": {"users": [owner]},
+                "nonce": episode.nonce,
+                "enforce_nonce": True,
+            }
+
+        def mark(found: _Episode, _id: str) -> None:
+            found.pinged = True
+
+        try:
+            discord_post.send_messages(settings, http, [episode], body, mark)
+        except KeychainError:
+            pass
+    return episode
 
 
 class _Listener:
@@ -208,6 +265,7 @@ class _Listener:
         try:
             store = open_store(self._settings)
             held.append(store)
+            store.set_lock_wait(LISTENER_LOCK_SECONDS)
             http = self._open_http()
             held.append(http)
             with self._lock:

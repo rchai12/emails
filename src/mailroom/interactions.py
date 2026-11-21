@@ -1,3 +1,4 @@
+import sqlite3
 import unicodedata
 import urllib.parse
 from datetime import date
@@ -13,7 +14,7 @@ from mailroom.config import Settings
 from mailroom.deadlines import read_deadline
 from mailroom.discord_post import DiscordUnavailable
 from mailroom.record import Record
-from mailroom.store import Answer, Due, Post, Store, Verdict
+from mailroom.store import Answer, Due, Post, Store, Verdict, is_busy
 
 _PRESS_ACTIONS = frozenset(
     {
@@ -54,6 +55,18 @@ def handle_interaction(
         else:
             _send(http, event, {"type": L.DEFERRED_UPDATE})
         return "ignored"
+    try:
+        return _handle(event, kind, store, settings, http)
+    except sqlite3.OperationalError as error:
+        if not is_busy(error):
+            raise
+    _send(http, event, _private(L.BUSY_TEXT))
+    return "busy"
+
+
+def _handle(
+    event: dict[str, object], kind: int, store: Store, settings: Settings, http: httpx.Client
+) -> str:
     if kind == 2:
         answered = _slash(event, store, settings, http)
         if answered is not None:

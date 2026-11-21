@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status (2026-11-17): Phases 0 to 3b and 4a to 4d are done and reviewed. The owner has verified the [codebase audit](codebase-audit.md); its remediation is planned below. **4e is specified and validated**, pending a committed planning baseline before implementation; 4f to 4t remain planned before Yahoo. Phase 3c's tasks-app implementation prerequisite now exists; its authenticated integration and cross-check remain to be specified.
+Status (2026-11-21): Phases 0 to 3b and 4a to 4e are done and reviewed. The owner has verified the [codebase audit](codebase-audit.md); its remediation is planned below. **4f is specified and validated**, pending a committed planning baseline before implementation; 4g to 4t remain planned before Yahoo. Phase 3c's tasks-app implementation prerequisite now exists; its authenticated integration and cross-check remain to be specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -50,7 +50,7 @@ Build one stage at a time, and move on only when its test passes. Stage N is Pha
    - **4b** Outlook sync: the delta bookmark, inbox only, dedup, first run (3 days), catch-up after an expired link. Done.
    - **4c** `mailroom outlook-login`: browser consent on a 127.0.0.1 listener that stores the refresh token. Done.
    - **4d** Outlook in the service: settings, each round, alerts, the card footer, and stage 4's test. Done; the corrected spec and implementation have a [PASS review](reviews/phase-04d-outlook-service.md).
-   - **4e to 4t** the verified audit's reliability fixes and preparation for another provider/card. Sequenced below; [4e spec](phases/phase-04e-gateway-input.md) and [verification guide](verification/phase-04e-gateway-input.md) are validated. Commit their given artifacts before the coder starts; later phase specs follow their predecessor reviews.
+   - **4e to 4t** the verified audit's reliability fixes and preparation for another provider/card. Sequenced below; 4e passed review. [4f spec](phases/phase-04f-listener-recovery.md) and [verification guide](verification/phase-04f-listener-recovery.md) are validated. Commit their given artifacts before the coder starts; later phase specs follow their predecessor reviews.
 5. **Yahoo adapter** over IMAP using the same pipeline.
    Test: identical emails give identical verdicts from all three providers; a poll leaves every message unread and unchanged in Yahoo; a `UIDVALIDITY` change creates no duplicates.
    Start only after 4e to 4t pass. Reuse provider-neutral sync policy and account dispatch; Yahoo's IMAP/app-password behavior stays provider-specific and must not acquire an OAuth dependency. Add its fake in the provider-specific test module established by 4s. Split the client, sync and service/sign-in work into bounded specs before implementation.
@@ -99,7 +99,7 @@ Attach this to the existing Gmail login/deployment checklist and carry it throug
 
 **Accepted input:** the owner confirmed on November 17, 2026 that all findings in [the audit](codebase-audit.md) are verified. The audit was written against `879de3b`; the subsequent workflow commit `06a5fba` adds development tooling, not mail-service fixes. Do not repeat the audit or mark a finding closed because it now has a roadmap row.
 
-Except for the linked Phase 4e spec/guide, these are ordered planning scopes and acceptance targets, **not coder-ready specs**. Each needs its own exact Scope, given files, failing-first tests for fixes, verification guide and offline probe before handoff. Apply the phase size limits when drafting; split an oversized unbuilt row rather than delivering a large reference implementation. Existing public imports, persisted values, messages and Discord custom ids remain contracts unless a spec explicitly lists their migration.
+Except for the linked Phase 4e and 4f specs/guides, these are ordered planning scopes and acceptance targets, **not coder-ready specs**. Each needs its own exact Scope, given files, failing-first tests for fixes, verification guide and offline probe before handoff. Apply the phase size limits when drafting; split an oversized unbuilt row rather than delivering a large reference implementation. Existing public imports, persisted values, messages and Discord custom ids remain contracts unless a spec explicitly lists their migration.
 
 The last product phase passed 1,212 tests; the subsequent [workflow maintenance](agent-workflow.md#workflow-maintenance-evidence-november-17-2026) passed **1,230** (77 tooling, 1,153 core). Use that verified starting evidence when specifying 4e, then use each successor's actual results. Do not rerun the suite solely to rediscover N.
 

@@ -72,3 +72,14 @@ questions: malformed Gateway frames reconnect through the existing resume/backof
 path; malformed interaction bodies with valid callback addressing are safely
 acknowledged and ignored without state changes. Unknown interaction kinds or
 unaddressable callbacks are ignored without HTTP, as specified in Phase 4e.
+
+## Phase 4f listener recovery (2026-11-21)
+
+The owner selected the recommended option in each of the architect's three
+multiple-choice questions. A listener that fails for a recoverable reason restarts
+quietly, and the owner is pinged only after it has kept failing for 15 minutes,
+then told once it is answering again (rather than a ping on every failure, or
+none). It restarts forever, waiting 1, 2, 4, 8, 16, 32 and then 60 seconds, and
+the wait resets once a listener survives a full poll round (rather than giving up
+after 10). A missing bot token stays terminal, while an unavailable Keychain is
+retried (rather than treating both as terminal).

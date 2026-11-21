@@ -155,6 +155,11 @@ ALERT_GATEWAY = (
     "service is restarted."
 )
 ALERT_GATEWAY_FIXED = "The Discord listener is running again."
+ALERT_LISTENER = (
+    "The Discord listener has kept failing for 15 minutes ({reason}). It restarts on its own; "
+    "buttons and commands may not answer until it does."
+)
+ALERT_LISTENER_FIXED = "The Discord listener is answering again."
 ALERT_MODEL = (
     "The local model has been unreachable for 15 minutes. New mail is waiting; nothing is lost."
 )

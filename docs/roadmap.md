@@ -2,7 +2,7 @@
 
 ## Build order and acceptance tests
 
-Status (2026-11-21): Phases 0 to 3b and 4a to 4g are done and reviewed. The owner has verified the [codebase audit](codebase-audit.md); its remediation is planned below. **4h is specified and validated**, pending a committed planning baseline before implementation; 4i to 4t remain planned before Yahoo. Phase 3c's tasks-app implementation prerequisite now exists; its authenticated integration and cross-check remain to be specified.
+Status (2026-11-21): Phases 0 to 3b and 4a to 4h are done and reviewed. The owner has verified the [codebase audit](codebase-audit.md); its remediation is planned below. **4i is specified and validated**, pending a committed planning baseline before implementation; 4j to 4t remain planned before Yahoo. Phase 3c's tasks-app implementation prerequisite now exists; its authenticated integration and cross-check remain to be specified.
 
 Build one stage at a time, and move on only when its test passes. Stage N is Phase N, split into lettered sub-phases (`1a`, `1b`) when it is too big.
 
@@ -99,7 +99,7 @@ Attach this to the existing Gmail login/deployment checklist and carry it throug
 
 **Accepted input:** the owner confirmed on November 17, 2026 that all findings in [the audit](codebase-audit.md) are verified. The audit was written against `879de3b`; the subsequent workflow commit `06a5fba` adds development tooling, not mail-service fixes. Do not repeat the audit or mark a finding closed because it now has a roadmap row.
 
-Except for the linked Phase 4e, 4f, 4g and 4h specs/guides, these are ordered planning scopes and acceptance targets, **not coder-ready specs**. Each needs its own exact Scope, given files, failing-first tests for fixes, verification guide and offline probe before handoff. Apply the phase size limits when drafting; split an oversized unbuilt row rather than delivering a large reference implementation. Existing public imports, persisted values, messages and Discord custom ids remain contracts unless a spec explicitly lists their migration.
+Except for the linked Phase 4e, 4f, 4g, 4h and 4i specs/guides, these are ordered planning scopes and acceptance targets, **not coder-ready specs**. Each needs its own exact Scope, given files, failing-first tests for fixes, verification guide and offline probe before handoff. Apply the phase size limits when drafting; split an oversized unbuilt row rather than delivering a large reference implementation. Existing public imports, persisted values, messages and Discord custom ids remain contracts unless a spec explicitly lists their migration.
 
 The last product phase passed 1,212 tests; the subsequent [workflow maintenance](agent-workflow.md#workflow-maintenance-evidence-november-17-2026) passed **1,230** (77 tooling, 1,153 core). Use that verified starting evidence when specifying 4e, then use each successor's actual results. Do not rerun the suite solely to rediscover N.
 

@@ -110,3 +110,18 @@ restart loses the held token, which the alert states along with the
 `mailroom outlook-login` fix (rather than giving up after an hour). The access token
 from the unsaved refresh is never used. The token is never written anywhere but the
 Keychain, and the alert is resolved only by a round that read mail.
+
+## Phase 4i incomplete stored chains (2026-11-21)
+
+The owner selected the recommended option in each of the architect's four
+multiple-choice questions. Task and link sends get the same guard as card posting and
+presses (rather than leaving them for a later phase). A poll round keeps an
+incomplete card, task or link unsent and queued, sends the others, shows an
+`ok (N incomplete)` status line, and posts one unpinged notice per item naming only
+its item id (rather than a status line alone, or a ping). A press or form on an
+incomplete email gets the private reply "Mailroom can't act on this email: its stored
+details are incomplete." and records nothing (rather than a silent acknowledgement).
+Show full text follows the same rule (rather than working whenever the message row
+exists). Nothing is repaired or deleted; database constraints remain Phase 6a. A
+missing answer row is the same state as an unanswered card, which is already refused
+safely, so it needs no change.

@@ -141,3 +141,28 @@ with "duplicate stored column: <name>" (rather than letting the later value win)
 architect placed one due reader and writer, `due_columns` and `read_due`, in
 `store/triage.py`, where `Due` lives. The Store facade, method placement, schema and
 write SQL are unchanged.
+
+## Phase 4k shared OAuth mechanics (2026-11-22)
+
+The owner chose the recommended option in each of the architect's four multiple-choice
+questions:
+
+- **Module.** The shared sign-in pieces live in `mailroom/oauth.py`, a module that names
+  no provider. The other choices were a login package and keeping them in `gmail_login`.
+- **Token reply.** The check is shared as `oauth.token_reply`, which gives one error
+  contract. The other choice was sharing only the callback and PKCE. The checks cover:
+  - network errors and statuses;
+  - a body that is not JSON or not an object;
+  - a refresh token that is missing, not text or empty;
+  - a scope that is missing or not text.
+
+  As a result, Gmail now refuses an empty refresh token, as Outlook already did. Scope
+  rules stay with each provider.
+- **Callback.** `oauth.Callback` requires its `provider` keyword. `gmail_login` keeps a
+  thin subclass that defaults to `"gmail"`, so existing imports and calls still work.
+  The other choice was keeping a gmail default in the neutral class.
+- **Closing.** Each CLI login command opens its HTTP client in a `with` block and closes
+  it on success, cancellation and every error. `login()` keeps borrowing the client it
+  is given. The other choice was `login()` owning the client.
+
+The architect listed `oauth.py` as a critical module in `docs/testing.md`.

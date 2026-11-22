@@ -37,6 +37,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `outlook.py` (read-only Graph calls, the rotated refresh token kept, the token sent only to Graph; Phase 4a)
 - `gmail_sync.py` (what reaches the database: inbox only, once each, nothing lost on a failure; Phase 1c)
 - `gmail_login.py` (read-only scope only, secrets never shown, nothing stored on a failed sign-in; Phase 1d)
+- `oauth.py` (the sign-in callback's state and timeout, PKCE, and one constant error for any bad token reply; Phase 4k)
 - `sender_auth.py` and `rules.py` (who is verified and trusted, and what is dropped; Phase 1e)
 - `extractor.py` (what model output is accepted; Phase 1f)
 - `triage.py` (what reaches you, and in what order; Phase 1g)

@@ -31,6 +31,31 @@ must show `1559 passed`. Nothing needs a missing-module stub. The two new given 
 import only names that exist today. They reach `mailroom.mail_sync` through
 `importlib.import_module` when a test runs.
 
+## Corrections
+
+- **2026-11-22, after the first review (FAIL, `8582566`).** The review found one
+  defect, in the coder's tests; the product code matches this spec.
+  `test_gmail_skips_mail_labelled_both_inbox_and_spam` delivers its message on a
+  first run. `FakeGmail`'s inbox list already leaves out mail labelled `SPAM` or
+  `TRASH`, so that message is never fetched and the test passes with the `SPAM` check
+  removed from the Gmail fetch filter. This spec's "Tests to write" line did not say
+  the test must reach the fetch filter; it now does.
+  - Requirement: a test in `tests/integration/test_sync_adapters.py` shows that Gmail
+    skips a message labelled both `INBOX` and `SPAM` **after fetching it**.
+  - Observation: only a history resume or catch-up reaches `fetch` with such a
+    message. FakeGmail's history keeps a message added with `INBOX` among its labels.
+  - Required result: the test asserts the message was fetched and not stored. It fails
+    when `or "SPAM" in labels` is removed from `src/mailroom/gmail_sync.py` and passes
+    on the committed code. Replace the first-run test or keep it, whichever you
+    choose; record which in the progress entry.
+  - Nothing else changes. Product code, given files, probes and other tests stay as
+    they are. The suite stays at least 1577 passed (1578 if the first-run test is kept).
+  - Progress: update the Phase 4l entry with
+    `.venv/bin/python scripts/progress.py --replace`, keeping its other fields. Add a
+    Follow-ups item: `Correction 2026-11-22: Gmail INBOX+SPAM test now reaches fetch`.
+  - Skip Start (its 1559 count is the pre-implementation baseline). Rerun every
+    Acceptance command. The G7 row's baseline is the commit that adds this correction.
+
 ## Facts
 
 - `gmail_sync.py` defines `FIRST_RUN` (3 days), `CATCH_UP_LIMIT` (14 days),
@@ -230,7 +255,9 @@ Add behavior tests in `tests/integration/test_sync_adapters.py`, not a `_more` f
 leave unpinned, at least:
 
 - Gmail skips a message labelled both `INBOX` and `SPAM`. No existing test pins this;
-  the spam case there has no `INBOX` label.
+  the spam case there has no `INBOX` label. The message must reach the fetch filter:
+  FakeGmail's first-run list already leaves out spam and trash, so deliver it after a
+  bookmark and let a history round fetch it (see Corrections).
 - Each adapter's `resume` returns `None` on its own expiry error only. Another error from
   `history` or `next_delta`, such as a transport failure, propagates from `sync_gmail` or
   `sync_outlook` and leaves the bookmark unchanged.

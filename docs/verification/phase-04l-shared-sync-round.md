@@ -114,6 +114,9 @@ against the coder's code. If a row fails in a different way, diagnose it. If a m
 passes, the test may be weak rather than the product defective. Report the difference
 either way. Y14 had no given or existing test at planning time. If the coder's tests do
 not catch it, report the missing test as a finding against "Tests to write".
+FakeGmail's first-run list leaves out spam and trash before any fetch, so a Y14 test
+must deliver the message after a bookmark and reach `fetch` through a history round
+(spec Corrections, 2026-11-22). Confirm the test asserts the message was fetched.
 
 ## 4. Probe
 
@@ -201,6 +204,27 @@ Classify each defect by its requirement, the observed result and the required re
 Do not repair code or tests. Run G6 after writing it.
 
 ## Handoff prompts
+
+### Correction run (2026-11-22)
+
+The first review failed (`8582566`) on the Y14 test only. After the correction commit,
+with a clean checkout:
+
+> Use $phase-coder to apply only the 2026-11-22 correction in the Corrections section of
+> docs/phases/phase-04l-shared-sync-round.md in this checkout. Change only
+> tests/integration/test_sync_adapters.py and the Phase 4l progress entry (with
+> scripts/progress.py --replace). Run all Acceptance commands. Do not
+> read the verification guide or write a review.
+
+Then, in another fresh session:
+
+> Use $phase-verifier to re-review Phase 4l against
+> docs/phases/phase-04l-shared-sync-round.md and
+> docs/verification/phase-04l-shared-sync-round.md, including its Corrections section.
+> The baseline is the correction commit. Run every gate, probe, search and scratch-only
+> spot check fresh, Y14 included; overwrite only docs/reviews/phase-04l-shared-sync-round.md.
+
+### First run
 
 Only after the final planning documents and given files are committed and the coder's
 checkout is clean:

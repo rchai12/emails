@@ -6,7 +6,7 @@ from collections.abc import Callable
 import httpx
 
 from mailroom import keychain, outlook
-from mailroom.gmail_login import Callback, LoginError, code_challenge, new_verifier
+from mailroom.oauth import Callback, LoginError, code_challenge, new_verifier, token_reply
 
 AUTH_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize"
 CLIENT_ID_LABEL = "Microsoft app (client) ID"
@@ -42,30 +42,20 @@ def exchange_code(
     verifier: str,
     redirect_uri: str,
 ) -> str:
-    try:
-        response = http.post(
-            outlook.TOKEN_URL,
-            data={
-                "client_id": client_id,
-                "scope": outlook.SCOPE,
-                "code": code,
-                "redirect_uri": redirect_uri,
-                "grant_type": "authorization_code",
-                "code_verifier": verifier,
-            },
-        )
-    except httpx.TransportError:
-        raise LoginError(f"outlook login failed: {account} (network)") from None
-    if response.status_code != 200:
-        raise LoginError(f"outlook login failed: {account} ({response.status_code})") from None
-    try:
-        body = response.json()
-        refresh_token = body.get("refresh_token")
-        scope = body.get("scope")
-    except (ValueError, AttributeError):
-        raise LoginError(f"outlook login failed: {account} (response)") from None
-    if not isinstance(refresh_token, str) or refresh_token == "" or not isinstance(scope, str):
-        raise LoginError(f"outlook login failed: {account} (response)") from None
+    refresh_token, scope = token_reply(
+        http,
+        outlook.TOKEN_URL,
+        {
+            "client_id": client_id,
+            "scope": outlook.SCOPE,
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+            "code_verifier": verifier,
+        },
+        provider="outlook",
+        account=account,
+    )
     granted = {part.lower() for part in scope.split()}
     if _READ not in granted or not granted <= _ALLOWED:
         raise LoginError(f"outlook login scope refused: {account}") from None

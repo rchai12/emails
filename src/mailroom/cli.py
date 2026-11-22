@@ -4,7 +4,7 @@ import webbrowser
 
 import typer
 
-from mailroom import __version__, commands, discord_post, gmail_login, outlook_login, service
+from mailroom import __version__, commands, discord_post, gmail_login, oauth, outlook_login, service
 from mailroom import discord_layout as L
 from mailroom.config import ConfigError, get_settings
 from mailroom.discord_post import DiscordUnavailable
@@ -36,14 +36,15 @@ def gmail_login_command(account: str, new_client: bool = False) -> None:
         webbrowser.open(address)
 
     try:
-        signed_in = gmail_login.login(
-            account,
-            gmail_login.new_http(),
-            ask=lambda label: typer.prompt(label, hide_input=True),
-            open_browser=open_browser,
-            new_client=new_client,
-        )
-    except (gmail_login.LoginError, GmailError, KeychainError, ValueError) as error:
+        with gmail_login.new_http() as http:
+            signed_in = gmail_login.login(
+                account,
+                http,
+                ask=lambda label: typer.prompt(label, hide_input=True),
+                open_browser=open_browser,
+                new_client=new_client,
+            )
+    except (oauth.LoginError, GmailError, KeychainError, ValueError) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from None
     typer.echo(f"Signed in: {account} ({signed_in})")
@@ -59,14 +60,15 @@ def outlook_login_command(account: str, new_client: bool = False) -> None:
         webbrowser.open(address)
 
     try:
-        signed_in = outlook_login.login(
-            account,
-            outlook_login.new_http(),
-            ask=lambda label: typer.prompt(label, hide_input=True),
-            open_browser=open_browser,
-            new_client=new_client,
-        )
-    except (gmail_login.LoginError, OutlookError, KeychainError, ValueError) as error:
+        with outlook_login.new_http() as http:
+            signed_in = outlook_login.login(
+                account,
+                http,
+                ask=lambda label: typer.prompt(label, hide_input=True),
+                open_browser=open_browser,
+                new_client=new_client,
+            )
+    except (oauth.LoginError, OutlookError, KeychainError, ValueError) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from None
     typer.echo(f"Signed in: {account} ({signed_in})")

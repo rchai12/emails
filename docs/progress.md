@@ -308,3 +308,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4k: Extract shared OAuth mechanics (2026-11-22)
+- Tests: 1529 -> 1559 (given 25)
+- New public names: oauth: CALLBACK_TIMEOUT, REQUEST_TIMEOUT_SECONDS, DONE_PAGE, CANCELLED_PAGE, LoginError, new_verifier, code_challenge, Callback, token_reply
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

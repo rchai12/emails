@@ -3,86 +3,53 @@
 from datetime import datetime
 from typing import Literal
 
-from mailroom import clock
-from mailroom.gmail_sync import CATCH_UP_LIMIT, CATCH_UP_OVERLAP, FIRST_RUN, SyncResult
-from mailroom.mime import parse_message
-from mailroom.outlook import DeltaExpired, MessageGone, MessageRef, OutlookClient
-from mailroom.record import LINK_LIMIT, Envelope, stored_id
-from mailroom.store import Store, SyncState
+from mailroom import mail_sync
+from mailroom.mail_sync import Fetched, Page, SyncResult
+from mailroom.outlook import DeltaExpired, MessageGone, OutlookClient
+from mailroom.record import LINK_LIMIT
+from mailroom.store import Store
 
 INBOX_LINK = "https://outlook.live.com/mail/0/inbox"
 WEB_LINK_PREFIX = "https://outlook.live.com/"
 
 
-def sync_outlook(client: OutlookClient, store: Store) -> SyncResult:
-    now = clock.now()
-    state = store.sync_state("outlook", client.account)
-    profile = client.profile()
-    kind, refs, delta_link, offline_since, gap = _choose(client, state, now)
-    stored = tuple(
-        message_id
-        for ref in refs
-        if (message_id := _store_message(client, store, profile.inbox_id, ref)) is not None
-    )
-    store.save_sync_state("outlook", client.account, SyncState(bookmark=delta_link, synced_at=now))
-    return SyncResult(
-        account=client.account,
-        kind=kind,
-        stored=stored,
-        offline_since=offline_since,
-        gap=gap,
-    )
+class _Outlook:
+    provider = "outlook"
+    resumed: Literal["history", "delta"] = "delta"
 
+    def __init__(self, client: OutlookClient) -> None:
+        self._client = client
+        self.account = client.account
+        self._inbox_id = ""
 
-def _choose(
-    client: OutlookClient,
-    state: SyncState | None,
-    now: datetime,
-) -> tuple[
-    Literal["first", "delta", "catch_up"],
-    tuple[MessageRef, ...],
-    str,
-    datetime | None,
-    bool,
-]:
-    if state is None:
-        found = client.first_delta(now - FIRST_RUN)
-        return "first", found.added, found.delta_link, None, False
-    try:
-        found = client.next_delta(state.bookmark)
-    except DeltaExpired:
-        after = max(state.synced_at - CATCH_UP_OVERLAP, now - CATCH_UP_LIMIT)
-        gap = now - state.synced_at > CATCH_UP_LIMIT
-        found = client.first_delta(after)
-        return "catch_up", found.added, found.delta_link, state.synced_at, gap
-    return "delta", found.added, found.delta_link, None, False
+    def begin(self) -> None:
+        self._inbox_id = self._client.profile().inbox_id
 
+    def start(self, after: datetime) -> Page:
+        found = self._client.first_delta(after)
+        return Page(tuple(ref.id for ref in found.added), found.delta_link)
 
-def _store_message(
-    client: OutlookClient, store: Store, inbox_id: str, ref: MessageRef
-) -> str | None:
-    kept = stored_id(client.account, ref.id)
-    if store.get("outlook", kept) is not None:
-        return None
-    try:
-        message = client.fetch(ref.id)
-    except (MessageGone, ValueError):
-        return None
-    if message.folder_id != inbox_id:
-        return None
-    try:
-        envelope = Envelope(
-            provider="outlook",
-            message_id=kept,
-            thread_id=stored_id(client.account, message.thread_id),
-            received_at=message.received_at,
-            link=_web_link(message.web_link),
+    def resume(self, bookmark: str) -> Page | None:
+        try:
+            found = self._client.next_delta(bookmark)
+        except DeltaExpired:
+            return None
+        return Page(tuple(ref.id for ref in found.added), found.delta_link)
+
+    def fetch(self, message_id: str) -> Fetched | None:
+        try:
+            message = self._client.fetch(message_id)
+        except (MessageGone, ValueError):
+            return None
+        if message.folder_id != self._inbox_id:
+            return None
+        return Fetched(
+            message.raw, message.thread_id, message.received_at, _web_link(message.web_link)
         )
-    except ValueError:
-        return None
-    if store.add(parse_message(message.raw, envelope)):
-        return kept
-    return None
+
+
+def sync_outlook(client: OutlookClient, store: Store) -> SyncResult:
+    return mail_sync.run_round(_Outlook(client), store)
 
 
 def _web_link(web_link: str) -> str:

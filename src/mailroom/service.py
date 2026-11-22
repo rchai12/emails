@@ -27,8 +27,8 @@ from mailroom.discord_post import DiscordUnavailable, PostReport
 from mailroom.extractor import ModelUnavailable
 from mailroom.gateway import GatewayStopped, run_gateway
 from mailroom.gmail import GmailAuthError, GmailClient, GmailError
-from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError, KeychainUnavailable, SecretMissing
+from mailroom.mail_sync import SyncResult
 from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError, OutlookTokenUnsaved
 from mailroom.store import Store, is_busy, open_store
 from mailroom.tasks_app import TasksUnavailable

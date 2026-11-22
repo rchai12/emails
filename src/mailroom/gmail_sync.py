@@ -1,93 +1,68 @@
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Literal
 from urllib.parse import quote
 
-from mailroom import clock
-from mailroom.gmail import BookmarkExpired, GmailClient, MessageGone, MessageRef
-from mailroom.mime import parse_message
-from mailroom.record import Envelope, stored_id
-from mailroom.store import Store, SyncState
+from mailroom import mail_sync
+from mailroom.gmail import BookmarkExpired, GmailClient, MessageGone
+from mailroom.mail_sync import (
+    CATCH_UP_LIMIT,
+    CATCH_UP_OVERLAP,
+    FIRST_RUN,
+    Fetched,
+    Page,
+    SyncResult,
+)
+from mailroom.store import Store
 
-FIRST_RUN = timedelta(days=3)
-CATCH_UP_LIMIT = timedelta(days=14)
-CATCH_UP_OVERLAP = timedelta(hours=1)
+__all__ = [
+    "CATCH_UP_LIMIT",
+    "CATCH_UP_OVERLAP",
+    "FIRST_RUN",
+    "LINK",
+    "SyncResult",
+    "sync_gmail",
+]
+
 LINK = "https://mail.google.com/mail/?authuser={address}#all/{message_id}"
 
 
-@dataclass(frozen=True)
-class SyncResult:
-    account: str
-    kind: Literal["first", "history", "delta", "catch_up"]
-    stored: tuple[str, ...]
-    offline_since: datetime | None
-    gap: bool
+class _Gmail:
+    provider = "gmail"
+    resumed: Literal["history", "delta"] = "history"
+
+    def __init__(self, client: GmailClient) -> None:
+        self._client = client
+        self.account = client.account
+        self._history_id = ""
+        self._address = ""
+
+    def begin(self) -> None:
+        profile = self._client.profile()
+        self._history_id = profile.history_id
+        self._address = profile.email_address
+
+    def start(self, after: datetime) -> Page:
+        refs = self._client.list_inbox(after)
+        return Page(tuple(ref.id for ref in refs), self._history_id)
+
+    def resume(self, bookmark: str) -> Page | None:
+        try:
+            found = self._client.history(bookmark)
+        except BookmarkExpired:
+            return None
+        return Page(tuple(ref.id for ref in found.added), found.history_id)
+
+    def fetch(self, message_id: str) -> Fetched | None:
+        try:
+            message = self._client.fetch(message_id)
+        except (MessageGone, ValueError):
+            return None
+        labels = message.label_ids
+        if "INBOX" not in labels or "SPAM" in labels or "TRASH" in labels:
+            return None
+        link = LINK.format(address=quote(self._address, safe="@"), message_id=message_id)
+        return Fetched(message.raw, message.thread_id, message.internal_date, link)
 
 
 def sync_gmail(client: GmailClient, store: Store) -> SyncResult:
-    now = clock.now()
-    state = store.sync_state("gmail", client.account)
-    profile = client.profile()
-    kind, refs, bookmark, offline_since, gap = _choose(client, state, profile.history_id, now)
-    stored = tuple(
-        message_id
-        for ref in refs
-        if (message_id := _store_message(client, store, profile.email_address, ref)) is not None
-    )
-    store.save_sync_state("gmail", client.account, SyncState(bookmark=bookmark, synced_at=now))
-    return SyncResult(
-        account=client.account,
-        kind=kind,
-        stored=stored,
-        offline_since=offline_since,
-        gap=gap,
-    )
-
-
-def _choose(
-    client: GmailClient,
-    state: SyncState | None,
-    history_id: str,
-    now: datetime,
-) -> tuple[
-    Literal["first", "history", "catch_up"],
-    tuple[MessageRef, ...],
-    str,
-    datetime | None,
-    bool,
-]:
-    if state is None:
-        return "first", client.list_inbox(now - FIRST_RUN), history_id, None, False
-    try:
-        found = client.history(state.bookmark)
-    except BookmarkExpired:
-        after = max(state.synced_at - CATCH_UP_OVERLAP, now - CATCH_UP_LIMIT)
-        gap = now - state.synced_at > CATCH_UP_LIMIT
-        return "catch_up", client.list_inbox(after), history_id, state.synced_at, gap
-    return "history", found.added, found.history_id, None, False
-
-
-def _store_message(client: GmailClient, store: Store, address: str, ref: MessageRef) -> str | None:
-    kept = stored_id(client.account, ref.id)
-    if store.get("gmail", kept) is not None:
-        return None
-    try:
-        message = client.fetch(ref.id)
-    except (MessageGone, ValueError):
-        return None
-    labels = message.label_ids
-    if "INBOX" not in labels or "SPAM" in labels or "TRASH" in labels:
-        return None
-    try:
-        envelope = Envelope(
-            provider="gmail",
-            message_id=kept,
-            thread_id=stored_id(client.account, message.thread_id),
-            received_at=message.internal_date,
-            link=LINK.format(address=quote(address, safe="@"), message_id=ref.id),
-        )
-    except ValueError:
-        return None
-    if store.add(parse_message(message.raw, envelope)):
-        return kept
-    return None
+    return mail_sync.run_round(_Gmail(client), store)

@@ -317,3 +317,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4l: Extract provider-neutral sync policy (2026-11-22)
+- Tests: 1559 -> 1577 (given 12)
+- New public names: mail_sync: FIRST_RUN, CATCH_UP_LIMIT, CATCH_UP_OVERLAP, SyncResult, Page, Fetched, Source, run_round
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

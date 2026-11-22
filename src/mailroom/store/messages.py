@@ -17,13 +17,22 @@ INSERT INTO messages (
 ON CONFLICT DO NOTHING
 """
 
-_SELECT = """
-SELECT provider, message_id, thread_id, received_at, link,
-       sender, sender_name, subject, sent_at, list_unsubscribe,
-       body_text, authentication_results, fetched_at, text_cleared_at
-FROM messages
-WHERE provider = ? AND message_id = ?
-"""
+MESSAGE_COLUMNS: tuple[str, ...] = (
+    "provider",
+    "message_id",
+    "thread_id",
+    "received_at",
+    "link",
+    "sender",
+    "sender_name",
+    "subject",
+    "sent_at",
+    "list_unsubscribe",
+    "body_text",
+    "authentication_results",
+    "fetched_at",
+    "text_cleared_at",
+)
 
 _CLEAR = """
 UPDATE messages
@@ -77,44 +86,40 @@ class MessageStore(StoreBase):
         return cursor.rowcount == 1
 
     def get(self, provider: str, message_id: str) -> StoredMessage | None:
-        row = self._connection.execute(_SELECT, (provider, message_id)).fetchone()
-        if row is None:
+        rows = self._select(
+            MESSAGE_COLUMNS,
+            """
+            FROM messages
+            WHERE provider = ? AND message_id = ?
+            """,
+            (provider, message_id),
+        )
+        if not rows:
             return None
-        (
-            found_provider,
-            found_id,
-            thread_id,
-            received_at,
-            link,
-            sender,
-            sender_name,
-            subject,
-            sent_at,
-            list_unsubscribe,
-            body_text,
-            authentication_results,
-            fetched_at,
-            text_cleared_at,
-        ) = row
+        row = rows[0]
+        sent_at = row["sent_at"]
+        body_text = row["body_text"]
+        authentication_results = row["authentication_results"]
+        text_cleared_at = row["text_cleared_at"]
         record = Record(
-            provider=found_provider,
-            message_id=found_id,
-            thread_id=thread_id,
-            received_at=self._read_time(received_at),
-            link=link,
-            sender=sender,
-            sender_name=sender_name,
-            subject=subject,
+            provider=row["provider"],
+            message_id=row["message_id"],
+            thread_id=row["thread_id"],
+            received_at=self._read_time(row["received_at"]),
+            link=row["link"],
+            sender=row["sender"],
+            sender_name=row["sender_name"],
+            subject=row["subject"],
             sent_at=None if sent_at is None else self._read_time(sent_at),
             body_text="" if body_text is None else body_text,
-            list_unsubscribe=bool(list_unsubscribe),
+            list_unsubscribe=bool(row["list_unsubscribe"]),
             authentication_results=(
                 () if authentication_results is None else tuple(json.loads(authentication_results))
             ),
         )
         return StoredMessage(
             record=record,
-            fetched_at=self._read_time(fetched_at),
+            fetched_at=self._read_time(row["fetched_at"]),
             text_cleared_at=None if text_cleared_at is None else self._read_time(text_cleared_at),
         )
 

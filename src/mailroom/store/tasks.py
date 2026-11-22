@@ -26,6 +26,25 @@ class Link:
     sent_at: datetime | None
 
 
+TASK_COLUMNS: tuple[str, ...] = (
+    "item_id",
+    "provider",
+    "message_id",
+    "queued_at",
+    "task_id",
+    "sent_at",
+)
+LINK_COLUMNS: tuple[str, ...] = (
+    "links.item_id",
+    "links.provider",
+    "links.message_id",
+    "links.task_item_id",
+    "tasks.task_id",
+    "links.queued_at",
+    "links.sent_at",
+)
+
+
 class TaskStore(StoreBase):
     def queue_approved(self) -> int:
         queued_at = self._stamp(clock.now())
@@ -47,14 +66,14 @@ class TaskStore(StoreBase):
         return cursor.rowcount
 
     def pending_tasks(self) -> tuple[Task, ...]:
-        rows = self._connection.execute(
+        rows = self._select(
+            TASK_COLUMNS,
             """
-            SELECT item_id, provider, message_id, queued_at, task_id, sent_at
             FROM tasks
             WHERE task_id IS NULL
             ORDER BY queued_at, item_id
-            """
-        ).fetchall()
+            """,
+        )
         return tuple(_read_task(row) for row in rows)
 
     def mark_task_sent(self, item_id: str, task_id: str) -> bool:
@@ -71,17 +90,15 @@ class TaskStore(StoreBase):
         return cursor.rowcount == 1
 
     def task(self, item_id: str) -> Task | None:
-        row = self._connection.execute(
+        rows = self._select(
+            TASK_COLUMNS,
             """
-            SELECT item_id, provider, message_id, queued_at, task_id, sent_at
             FROM tasks
             WHERE item_id = ?
             """,
             (item_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return _read_task(row)
+        )
+        return _read_task(rows[0]) if rows else None
 
     def queue_linked(self) -> int:
         queued_at = self._stamp(clock.now())
@@ -104,16 +121,15 @@ class TaskStore(StoreBase):
         return cursor.rowcount
 
     def pending_links(self) -> tuple[Link, ...]:
-        rows = self._connection.execute(
+        rows = self._select(
+            LINK_COLUMNS,
             """
-            SELECT links.item_id, links.provider, links.message_id, links.task_item_id,
-                   tasks.task_id, links.queued_at, links.sent_at
             FROM links
             JOIN tasks ON tasks.item_id = links.task_item_id
             WHERE links.sent_at IS NULL AND tasks.task_id IS NOT NULL
             ORDER BY links.queued_at, links.item_id
-            """
-        ).fetchall()
+            """,
+        )
         return tuple(_read_link(row) for row in rows)
 
     def mark_link_sent(self, item_id: str) -> bool:
@@ -130,41 +146,38 @@ class TaskStore(StoreBase):
         return cursor.rowcount == 1
 
     def link(self, item_id: str) -> Link | None:
-        row = self._connection.execute(
+        rows = self._select(
+            LINK_COLUMNS,
             """
-            SELECT links.item_id, links.provider, links.message_id, links.task_item_id,
-                   tasks.task_id, links.queued_at, links.sent_at
             FROM links
             LEFT JOIN tasks ON tasks.item_id = links.task_item_id
             WHERE links.item_id = ?
             """,
             (item_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return _read_link(row)
+        )
+        return _read_link(rows[0]) if rows else None
 
 
-def _read_task(row: tuple) -> Task:
-    item_id, provider, message_id, queued_at, task_id, sent_at = row
+def _read_task(row: dict[str, object]) -> Task:
+    sent_at = row["sent_at"]
     return Task(
-        item_id=item_id,
-        provider=provider,
-        message_id=message_id,
-        queued_at=StoreBase._read_time(queued_at),
-        task_id=task_id,
+        item_id=row["item_id"],
+        provider=row["provider"],
+        message_id=row["message_id"],
+        queued_at=StoreBase._read_time(row["queued_at"]),
+        task_id=row["task_id"],
         sent_at=None if sent_at is None else StoreBase._read_time(sent_at),
     )
 
 
-def _read_link(row: tuple) -> Link:
-    item_id, provider, message_id, task_item_id, task_id, queued_at, sent_at = row
+def _read_link(row: dict[str, object]) -> Link:
+    sent_at = row["sent_at"]
     return Link(
-        item_id=item_id,
-        provider=provider,
-        message_id=message_id,
-        task_item_id=task_item_id,
-        task_id=task_id,
-        queued_at=StoreBase._read_time(queued_at),
+        item_id=row["item_id"],
+        provider=row["provider"],
+        message_id=row["message_id"],
+        task_item_id=row["task_item_id"],
+        task_id=row["task_id"],
+        queued_at=StoreBase._read_time(row["queued_at"]),
         sent_at=None if sent_at is None else StoreBase._read_time(sent_at),
     )

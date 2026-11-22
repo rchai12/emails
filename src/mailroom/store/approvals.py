@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import datetime
 from typing import Literal
 
 from mailroom import clock
 from mailroom.store.base import StoreBase
-from mailroom.store.triage import Due
+from mailroom.store.triage import Due, due_columns, read_due
 
 
 @dataclass(frozen=True)
@@ -27,24 +27,20 @@ ON CONFLICT DO NOTHING
 """
 
 
-def _due_columns(due: Due | None) -> tuple[str | None, str | None]:
-    if due is None:
-        return None, None
-    deadline_time = None if due.time is None else due.time.strftime("%H:%M")
-    return due.date.isoformat(), deadline_time
-
-
-def _read_due(deadline_date: str | None, deadline_time: str | None) -> Due | None:
-    if deadline_date is None:
-        return None
-    parsed = None if deadline_time is None else time.fromisoformat(deadline_time)
-    return Due(date=date.fromisoformat(deadline_date), time=parsed)
+APPROVAL_COLUMNS: tuple[str, ...] = (
+    "approvals.item_id",
+    "approvals.outcome",
+    "approvals.title",
+    "approvals.deadline_date",
+    "approvals.deadline_time",
+    "approvals.decided_at",
+)
 
 
 class ApprovalStore(StoreBase):
     def record_approval(self, item_id: str, outcome: str, title: str, due: Due | None) -> bool:
         decided_at = self._stamp(clock.now())
-        deadline_date, deadline_time = _due_columns(due)
+        deadline_date, deadline_time = due_columns(due)
         with self._write():
             cursor = self._connection.execute(
                 _INSERT,
@@ -55,7 +51,7 @@ class ApprovalStore(StoreBase):
     def record_combined(self, item_id: str, outcome: str, title: str, due: Due | None) -> bool:
         decided_at = self._stamp(clock.now())
         answer = "edit" if outcome == "change" else "yes"
-        deadline_date, deadline_time = _due_columns(due)
+        deadline_date, deadline_time = due_columns(due)
         with self._write():
             added = self._connection.execute(
                 """
@@ -79,10 +75,9 @@ class ApprovalStore(StoreBase):
         return True
 
     def approved_in_thread(self, provider: str, thread_id: str) -> Approval | None:
-        row = self._connection.execute(
+        rows = self._select(
+            APPROVAL_COLUMNS,
             """
-            SELECT approvals.item_id, approvals.outcome, approvals.title,
-                   approvals.deadline_date, approvals.deadline_time, approvals.decided_at
             FROM approvals
             JOIN posts ON posts.item_id = approvals.item_id
             JOIN messages ON messages.provider = posts.provider
@@ -94,31 +89,26 @@ class ApprovalStore(StoreBase):
             LIMIT 1
             """,
             (provider, thread_id),
-        ).fetchone()
-        if row is None:
-            return None
-        return _approval(row)
+        )
+        return _approval(rows[0]) if rows else None
 
     def approval(self, item_id: str) -> Approval | None:
-        row = self._connection.execute(
+        rows = self._select(
+            APPROVAL_COLUMNS,
             """
-            SELECT item_id, outcome, title, deadline_date, deadline_time, decided_at
             FROM approvals
             WHERE item_id = ?
             """,
             (item_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return _approval(row)
+        )
+        return _approval(rows[0]) if rows else None
 
 
-def _approval(row: tuple) -> Approval:
-    found_id, outcome, title, deadline_date, deadline_time, decided_at = row
+def _approval(row: dict[str, object]) -> Approval:
     return Approval(
-        item_id=found_id,
-        outcome=outcome,
-        title=title,
-        due=_read_due(deadline_date, deadline_time),
-        decided_at=StoreBase._read_time(decided_at),
+        item_id=row["item_id"],
+        outcome=row["outcome"],
+        title=row["title"],
+        due=read_due(row["deadline_date"], row["deadline_time"]),
+        decided_at=StoreBase._read_time(row["decided_at"]),
     )

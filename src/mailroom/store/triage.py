@@ -84,12 +84,34 @@ class Verdict:
     due: Due | None = None
 
 
-def _read_due(deadline_date: str | None, deadline_time: str | None) -> Due | None:
+def due_columns(due: Due | None) -> tuple[str | None, str | None]:
+    if due is None:
+        return None, None
+    deadline_time = None if due.time is None else due.time.strftime("%H:%M")
+    return due.date.isoformat(), deadline_time
+
+
+def read_due(deadline_date: str | None, deadline_time: str | None) -> Due | None:
     if deadline_date is None:
         return None
-    if deadline_time is None:
-        return Due(date=date.fromisoformat(deadline_date), time=None)
-    return Due(date=date.fromisoformat(deadline_date), time=time.fromisoformat(deadline_time))
+    parsed = None if deadline_time is None else time.fromisoformat(deadline_time)
+    return Due(date=date.fromisoformat(deadline_date), time=parsed)
+
+
+TRIAGE_COLUMNS: tuple[str, ...] = (
+    "outcome",
+    "trusted",
+    "verified",
+    "bulk",
+    "notify",
+    "extraction",
+    "reason",
+    "decided_at",
+    "text_cleared_at",
+    "deadline_date",
+    "deadline_time",
+    "dated",
+)
 
 
 @dataclass(frozen=True)
@@ -102,7 +124,7 @@ class StoredTriage:
 class TriageStore(StoreBase):
     def save_triage(self, provider: str, message_id: str, verdict: Verdict) -> bool:
         decided_at = self._stamp(clock.now())
-        due = verdict.due
+        deadline_date, deadline_time = due_columns(verdict.due)
         with self._write():
             cursor = self._connection.execute(
                 _TRIAGE_INSERT,
@@ -115,8 +137,8 @@ class TriageStore(StoreBase):
                     1 if verdict.notify else 0,
                     None if verdict.extraction is None else _dump_extraction(verdict.extraction),
                     decided_at,
-                    None if due is None else due.date.isoformat(),
-                    None if due is None or due.time is None else due.time.strftime("%H:%M"),
+                    deadline_date,
+                    deadline_time,
                     1 if verdict.dated else 0,
                     provider,
                     message_id,
@@ -125,44 +147,32 @@ class TriageStore(StoreBase):
         return cursor.rowcount == 1
 
     def triage(self, provider: str, message_id: str) -> StoredTriage | None:
-        row = self._connection.execute(
+        rows = self._select(
+            TRIAGE_COLUMNS,
             """
-            SELECT outcome, trusted, verified, bulk, notify, extraction, reason,
-                   decided_at, text_cleared_at, deadline_date, deadline_time, dated
             FROM triage
             WHERE provider = ? AND message_id = ?
             """,
             (provider, message_id),
-        ).fetchone()
-        if row is None:
+        )
+        if not rows:
             return None
-        (
-            outcome,
-            trusted,
-            verified,
-            bulk,
-            notify,
-            extraction,
-            reason,
-            decided_at,
-            cleared,
-            deadline_date,
-            deadline_time,
-            dated,
-        ) = row
+        row = rows[0]
+        extraction = row["extraction"]
+        cleared = row["text_cleared_at"]
         return StoredTriage(
             verdict=Verdict(
-                outcome=outcome,
-                trusted=bool(trusted),
-                verified=bool(verified),
-                bulk=bool(bulk),
-                notify=bool(notify),
+                outcome=row["outcome"],
+                trusted=bool(row["trusted"]),
+                verified=bool(row["verified"]),
+                bulk=bool(row["bulk"]),
+                notify=bool(row["notify"]),
                 extraction=None if extraction is None else _load_extraction(extraction),
-                reason=reason,
-                dated=bool(dated),
-                due=_read_due(deadline_date, deadline_time),
+                reason=row["reason"],
+                dated=bool(row["dated"]),
+                due=read_due(row["deadline_date"], row["deadline_time"]),
             ),
-            decided_at=self._read_time(decided_at),
+            decided_at=self._read_time(row["decided_at"]),
             text_cleared_at=None if cleared is None else self._read_time(cleared),
         )
 

@@ -26,17 +26,29 @@ class Answer:
     answered_at: datetime
 
 
-def _read_post(row: tuple) -> Post:
-    item_id, provider, message_id, queued_at, discord_message_id, posted_at, card, follows = row
+POST_COLUMNS: tuple[str, ...] = (
+    "item_id",
+    "provider",
+    "message_id",
+    "queued_at",
+    "discord_message_id",
+    "posted_at",
+    "card",
+    "follows",
+)
+
+
+def _read_post(row: dict[str, object]) -> Post:
+    posted_at = row["posted_at"]
     return Post(
-        item_id=item_id,
-        provider=provider,
-        message_id=message_id,
-        queued_at=StoreBase._read_time(queued_at),
-        discord_message_id=discord_message_id,
+        item_id=row["item_id"],
+        provider=row["provider"],
+        message_id=row["message_id"],
+        queued_at=StoreBase._read_time(row["queued_at"]),
+        discord_message_id=row["discord_message_id"],
         posted_at=None if posted_at is None else StoreBase._read_time(posted_at),
-        card=card,
-        follows=follows,
+        card=row["card"],
+        follows=row["follows"],
     )
 
 
@@ -70,30 +82,26 @@ class PostStore(StoreBase):
         return len(rows)
 
     def pending_posts(self) -> tuple[Post, ...]:
-        rows = self._connection.execute(
+        rows = self._select(
+            POST_COLUMNS,
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at,
-                   card, follows
             FROM posts
             WHERE posted_at IS NULL
             ORDER BY queued_at, rowid
-            """
-        ).fetchall()
+            """,
+        )
         return tuple(_read_post(row) for row in rows)
 
     def post(self, provider: str, message_id: str) -> Post | None:
-        row = self._connection.execute(
+        rows = self._select(
+            POST_COLUMNS,
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at,
-                   card, follows
             FROM posts
             WHERE provider = ? AND message_id = ?
             """,
             (provider, message_id),
-        ).fetchone()
-        if row is None:
-            return None
-        return _read_post(row)
+        )
+        return _read_post(rows[0]) if rows else None
 
     def mark_posted(self, item_id: str, discord_message_id: str) -> bool:
         posted_at = self._stamp(clock.now())
@@ -109,18 +117,15 @@ class PostStore(StoreBase):
         return cursor.rowcount == 1
 
     def post_by_item(self, item_id: str) -> Post | None:
-        row = self._connection.execute(
+        rows = self._select(
+            POST_COLUMNS,
             """
-            SELECT item_id, provider, message_id, queued_at, discord_message_id, posted_at,
-                   card, follows
             FROM posts
             WHERE item_id = ?
             """,
             (item_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return _read_post(row)
+        )
+        return _read_post(rows[0]) if rows else None
 
     def record_answer(self, item_id: str, answer: str, title: str) -> bool:
         answered_at = self._stamp(clock.now())

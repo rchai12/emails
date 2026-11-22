@@ -8,6 +8,8 @@ from mailroom.schema import MIGRATIONS
 
 DB_FILENAME = "mailroom.sqlite3"
 SCHEMA_MESSAGE = "unsupported schema version"
+PROJECTION_MESSAGE = "duplicate stored column"
+CONSTRUCTOR_MESSAGE = "a store area must not define __init__"
 
 
 class StoreError(Exception):
@@ -22,6 +24,11 @@ def is_busy(error: BaseException) -> bool:
 
 
 class StoreBase:
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        if "__init__" in cls.__dict__:
+            raise TypeError(f"{CONSTRUCTOR_MESSAGE}: {cls.__name__}")
+
     def __init__(self, path: Path) -> None:
         self._connection = sqlite3.connect(path)
         self._connection.execute("PRAGMA secure_delete = ON")
@@ -37,6 +44,19 @@ class StoreBase:
             pragma = f"PRAGMA user_version = {index + 1};"
             script = "BEGIN;\n" + MIGRATIONS[index] + "\n" + pragma + "\nCOMMIT;"
             self._connection.executescript(script)
+
+    def _select(
+        self, columns: tuple[str, ...], tail: str, params: tuple[object, ...] = ()
+    ) -> list[dict[str, object]]:
+        """Run a SELECT of the named columns and return each row keyed by bare column name."""
+        cursor = self._connection.execute("SELECT " + ", ".join(columns) + "\n" + tail, params)
+        names = [column[0] for column in cursor.description]
+        seen: set[str] = set()
+        for name in names:
+            if name in seen:
+                raise StoreError(f"{PROJECTION_MESSAGE}: {name}")
+            seen.add(name)
+        return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
 
     def set_lock_wait(self, seconds: float) -> None:
         self._connection.execute(f"PRAGMA busy_timeout = {round(seconds * 1000)}")

@@ -299,3 +299,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4j: Stabilize store readers and lifecycle (2026-11-22)
+- Tests: 1488 -> 1529 (given 29)
+- New public names: base: PROJECTION_MESSAGE, CONSTRUCTOR_MESSAGE; posts: POST_COLUMNS; tasks: TASK_COLUMNS, LINK_COLUMNS; approvals: APPROVAL_COLUMNS, due_columns, read_due; messages: MESSAGE_COLUMNS; triage: TRIAGE_COLUMNS, due_columns, read_due
+- Changed files: 8
+- Deviations:
+  - None
+- Follow-ups:
+  - None

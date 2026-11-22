@@ -151,6 +151,12 @@ ALERT_GMAIL_AUTH = "Gmail sign-in needed for {account}. Run: mailroom gmail-logi
 ALERT_GMAIL_FIXED = "Gmail {account} works again."
 ALERT_OUTLOOK_AUTH = "Outlook sign-in needed for {account}. Run: mailroom outlook-login {account}"
 ALERT_OUTLOOK_FIXED = "Outlook {account} works again."
+ALERT_OUTLOOK_UNSAVED = (
+    "Outlook {account} got a new sign-in that the Keychain would not save. "
+    "Mailroom keeps it in memory and tries again each round. "
+    "If Mailroom stops before then, run: mailroom outlook-login {account}"
+)
+ALERT_OUTLOOK_SAVED = "Outlook {account} works again and its sign-in is saved."
 ALERT_GATEWAY = (
     "The Discord listener stopped: {reason}. Buttons and commands won't answer until the "
     "service is restarted."

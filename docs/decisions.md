@@ -97,3 +97,16 @@ listener's store waits 1.5 seconds for a lock and the poll loop's 10 seconds
 (rather than one shared wait). Because a locked database cannot store an alert, that
 ping is posted directly with one nonce per episode, while the "free again" notice
 uses the alert queue. WAL is not adopted.
+
+## Phase 4h rotated Outlook credentials (2026-11-21)
+
+The owner selected the recommended option in each of the architect's four
+multiple-choice questions. When Microsoft issues a new Outlook refresh token that the
+Keychain refuses to save, the client keeps it in memory, and the account reads no mail
+and reports the save failure until the token is saved (rather than reading on, or
+dropping the account until sign-in). The owner is pinged at once (rather than after
+15 minutes). The save is tried once per round for as long as the service runs, and a
+restart loses the held token, which the alert states along with the
+`mailroom outlook-login` fix (rather than giving up after an hour). The access token
+from the unsaved refresh is never used. The token is never written anywhere but the
+Keychain, and the alert is resolved only by a round that read mail.

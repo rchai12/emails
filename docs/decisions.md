@@ -166,3 +166,32 @@ questions:
   is given. The other choice was `login()` owning the client.
 
 The architect listed `oauth.py` as a critical module in `docs/testing.md`.
+
+## Phase 4l provider-neutral sync policy (2026-11-22)
+
+The owner chose the recommended option in each of the architect's four multiple-choice
+questions:
+
+- **Module.** `SyncResult`, the first-run and catch-up windows, and the shared round
+  live in `mailroom/mail_sync.py`, a module that names no provider. The other choices
+  were `mailroom/sync.py`, which sits beside `store/sync.py`, and
+  `mailroom/sync_policy.py`.
+- **Shared part.** Both the round and the storing steps are shared. The other choices
+  were sharing the round only, or only the names and windows. These steps are shared:
+  - the choice between first run, resume and catch-up;
+  - the store check before any fetch;
+  - building the stored ids and `Envelope`, and `store.add`;
+  - saving the bookmark only after a completed round.
+
+  Each adapter keeps its listing, its resume, and a fetch that applies its own
+  inbox/label/folder filter and link.
+- **Expiry.** An adapter's `resume` returns `None` when its bookmark expired. It catches
+  only its own `BookmarkExpired` or `DeltaExpired`. The other choices were a neutral
+  exception, or an adapter naming its exception type.
+- **Adapter.** Each provider has a small private class typed against
+  `mail_sync.Source`. `sync_gmail` and `sync_outlook` stay as thin public wrappers. The
+  other choice was keyword callables.
+
+The architect kept the call order: one clock read, then the bookmark, then the
+adapter's `begin()` profile read. The kind names `"history"` and `"delta"` stay in
+`SyncResult`. `mail_sync.py` was listed as a critical module.

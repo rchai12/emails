@@ -125,3 +125,19 @@ Show full text follows the same rule (rather than working whenever the message r
 exists). Nothing is repaired or deleted; database constraints remain Phase 6a. A
 missing answer row is the same state as an unanswered card, which is already refused
 safely, so it needs no change.
+
+## Phase 4j store readers and lifecycle (2026-11-22)
+
+The owner selected the recommended option in each of the architect's four
+multiple-choice questions. Each stored record type in scope gets one named column list
+(a module constant such as `POST_COLUMNS`), every SELECT for it uses that list, and
+rows are read by column name (rather than a shared unpacking helper that still reads
+by position, or a test-only check of column order). Defining `__init__` in any store
+area or in `Store` raises `TypeError` when the class is defined (rather than a test
+that only inspects today's classes). The readers in scope are posts, tasks, links,
+approvals, messages and triage; answers, alerts, problems, sync and senders stay
+positional. A column name that appears twice in a reader's result raises `StoreError`
+with "duplicate stored column: <name>" (rather than letting the later value win). The
+architect placed one due reader and writer, `due_columns` and `read_due`, in
+`store/triage.py`, where `Due` lives. The Store facade, method placement, schema and
+write SQL are unchanged.

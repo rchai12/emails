@@ -290,3 +290,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4i: Refuse incomplete stored chains safely (2026-11-21)
+- Tests: 1445 -> 1488 (given 40)
+- New public names: discord_post: incomplete, keep; PostReport: skipped
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import httpx
 
@@ -23,6 +23,7 @@ class PostReport:
     posted: int
     waiting: int
     stopped: str
+    skipped: int = 0
 
 
 def open_discord_http() -> httpx.Client:
@@ -61,6 +62,18 @@ def send_messages[T](
     return PostReport(posted, 0, "")
 
 
+def incomplete(store: Store, post: Post) -> bool:
+    if store.get(post.provider, post.message_id) is None:
+        return True
+    if store.triage(post.provider, post.message_id) is None:
+        return True
+    return post.card == "followup" and store.approval(post.follows) is None
+
+
+def keep(store: Store, item_id: str) -> None:
+    store.queue_alert(f"incomplete:{item_id}", L.ALERT_INCOMPLETE.format(item=item_id), False)
+
+
 def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostReport:
     if settings.discord_channel_id == "":
         raise DiscordUnavailable("not configured") from None
@@ -88,7 +101,15 @@ def post_pending(store: Store, settings: Settings, http: httpx.Client) -> PostRe
     def mark(post: Post, message_id: str) -> None:
         store.mark_posted(post.item_id, message_id)
 
-    return send_messages(settings, http, store.pending_posts(), body, mark)
+    pending = []
+    kept = 0
+    for post in store.pending_posts():
+        if incomplete(store, post):
+            keep(store, post.item_id)
+            kept += 1
+        else:
+            pending.append(post)
+    return replace(send_messages(settings, http, pending, body, mark), skipped=kept)
 
 
 def _wanted(verdict: Verdict, settings: Settings) -> str:

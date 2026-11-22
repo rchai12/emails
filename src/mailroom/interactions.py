@@ -12,7 +12,7 @@ from mailroom.checkpoint import _block, answered_message, approved_message, chec
 from mailroom.commands import handle_command
 from mailroom.config import Settings
 from mailroom.deadlines import read_deadline
-from mailroom.discord_post import DiscordUnavailable
+from mailroom.discord_post import DiscordUnavailable, incomplete
 from mailroom.record import Record
 from mailroom.store import Answer, Due, Post, Store, Verdict, is_busy
 
@@ -85,6 +85,9 @@ def _handle(
         _send(http, event, {"type": L.DEFERRED_UPDATE})
         return "ignored"
     post = store.post_by_item(item_id)
+    if incomplete(store, post):
+        _send(http, event, _private(L.INCOMPLETE_TEXT))
+        return "incomplete"
     stored = store.get(post.provider, post.message_id)
     triaged = store.triage(post.provider, post.message_id)
     record = stored.record

@@ -315,7 +315,7 @@ def _status(health: Health, part: str, call: Callable[[], PostReport]) -> PostRe
     if report.stopped:
         health.report(part, f"waiting ({report.stopped})")
         return report
-    health.report(part, "ok")
+    health.report(part, L.INCOMPLETE_STATE.format(count=report.skipped) if report.skipped else "ok")
     return report
 
 

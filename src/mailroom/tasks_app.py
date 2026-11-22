@@ -3,7 +3,7 @@ import re
 import httpx
 
 from mailroom.config import Settings
-from mailroom.discord_post import PostReport
+from mailroom.discord_post import PostReport, keep
 from mailroom.store import Approval, Link, Store, Task
 
 _TASK_ID = re.compile(r"\A[A-Za-z0-9_-]{1,100}\Z")
@@ -61,9 +61,15 @@ def send_tasks(store: Store, settings: Settings, http: httpx.Client) -> PostRepo
     store.queue_approved()
     pending = store.pending_tasks()
     posted = 0
+    skipped = 0
     for index, task in enumerate(pending):
         approval = store.approval(task.item_id)
-        link = store.get(task.provider, task.message_id).record.link
+        stored = store.get(task.provider, task.message_id)
+        if approval is None or stored is None:
+            keep(store, task.item_id)
+            skipped += 1
+            continue
+        link = stored.record.link
         try:
             response = http.post(
                 f"{settings.tasks_url}/tasks",
@@ -71,15 +77,15 @@ def send_tasks(store: Store, settings: Settings, http: httpx.Client) -> PostRepo
                 headers={"Idempotency-Key": task_key(task.provider, task.message_id)},
             )
         except httpx.TransportError:
-            return PostReport(posted, len(pending) - index, "network")
+            return PostReport(posted, len(pending) - index, "network", skipped)
         if response.status_code not in (200, 201):
-            return PostReport(posted, len(pending) - index, str(response.status_code))
+            return PostReport(posted, len(pending) - index, str(response.status_code), skipped)
         task_id = _task_id(response)
         if task_id is None:
-            return PostReport(posted, len(pending) - index, "response")
+            return PostReport(posted, len(pending) - index, "response", skipped)
         store.mark_task_sent(task.item_id, task_id)
         posted += 1
-    return _send_links(store, settings, http, posted)
+    return _send_links(store, settings, http, posted, skipped)
 
 
 def _task_id(response: httpx.Response) -> str | None:
@@ -92,12 +98,19 @@ def _task_id(response: httpx.Response) -> str | None:
     return None
 
 
-def _send_links(store: Store, settings: Settings, http: httpx.Client, posted: int) -> PostReport:
+def _send_links(
+    store: Store, settings: Settings, http: httpx.Client, posted: int, skipped: int
+) -> PostReport:
     store.queue_linked()
     pending = store.pending_links()
     linked = 0
     for index, link in enumerate(pending):
-        email_link = store.get(link.provider, link.message_id).record.link
+        stored = store.get(link.provider, link.message_id)
+        if stored is None:
+            keep(store, link.item_id)
+            skipped += 1
+            continue
+        email_link = stored.record.link
         try:
             response = http.post(
                 f"{settings.tasks_url}/tasks/{link.task_id}/links",
@@ -105,9 +118,11 @@ def _send_links(store: Store, settings: Settings, http: httpx.Client, posted: in
                 headers={"Idempotency-Key": task_key(link.provider, link.message_id)},
             )
         except httpx.TransportError:
-            return PostReport(posted + linked, len(pending) - index, "network")
+            return PostReport(posted + linked, len(pending) - index, "network", skipped)
         if response.status_code not in (200, 201):
-            return PostReport(posted + linked, len(pending) - index, str(response.status_code))
+            return PostReport(
+                posted + linked, len(pending) - index, str(response.status_code), skipped
+            )
         store.mark_link_sent(link.item_id)
         linked += 1
-    return PostReport(posted + linked, 0, "")
+    return PostReport(posted + linked, 0, "", skipped)

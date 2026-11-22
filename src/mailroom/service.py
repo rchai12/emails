@@ -29,7 +29,7 @@ from mailroom.gateway import GatewayStopped, run_gateway
 from mailroom.gmail import GmailAuthError, GmailClient, GmailError
 from mailroom.gmail_sync import SyncResult
 from mailroom.keychain import KeychainError, KeychainUnavailable, SecretMissing
-from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError
+from mailroom.outlook import OutlookAuthError, OutlookClient, OutlookError, OutlookTokenUnsaved
 from mailroom.store import Store, is_busy, open_store
 from mailroom.tasks_app import TasksUnavailable
 
@@ -353,11 +353,15 @@ def _outlook_account(store: Store, client: OutlookClient, health: Health) -> Non
     except OutlookAuthError as error:
         health.report(f"outlook {client.account}", str(error))
         _outlook(store, client.account, True)
+    except OutlookTokenUnsaved as error:
+        health.report(f"outlook {client.account}", str(error))
+        _outlook_token(store, client.account, True)
     except (OutlookError, KeychainError) as error:
         health.report(f"outlook {client.account}", str(error))
     else:
         health.report(f"outlook {client.account}", "ok")
         _outlook(store, client.account, False)
+        _outlook_token(store, client.account, False)
         _catch_up(store, client.account, result, "outlook")
 
 
@@ -382,6 +386,18 @@ def _outlook(store: Store, account: str, failing: bool) -> None:
         raised=L.ALERT_OUTLOOK_AUTH.format(account=account),
         ping=True,
         resolved=L.ALERT_OUTLOOK_FIXED.format(account=account),
+    )
+
+
+def _outlook_token(store: Store, account: str, failing: bool) -> None:
+    alerts.track(
+        store,
+        f"outlook-token:{account}",
+        failing,
+        wait=timedelta(0),
+        raised=L.ALERT_OUTLOOK_UNSAVED.format(account=account),
+        ping=True,
+        resolved=L.ALERT_OUTLOOK_SAVED.format(account=account),
     )
 
 

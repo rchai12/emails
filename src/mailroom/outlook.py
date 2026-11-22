@@ -34,6 +34,11 @@ class OutlookAuthError(OutlookError):
         super().__init__(f"outlook sign-in needed: {account}")
 
 
+class OutlookTokenUnsaved(OutlookError):
+    def __init__(self, account: str) -> None:
+        super().__init__(f"outlook new sign-in not saved: {account}")
+
+
 class OutlookUnavailable(OutlookError):
     def __init__(self, account: str, detail: int | str) -> None:
         super().__init__(f"outlook unavailable: {account} ({detail})")
@@ -85,6 +90,7 @@ class OutlookClient:
         self.http = http
         self._access_token: str | None = None
         self._expiry: datetime | None = None
+        self._held: str | None = None
 
     def profile(self) -> Profile:
         me = self._json(f"{API_URL}", {"$select": "mail,userPrincipalName"})
@@ -202,6 +208,9 @@ class OutlookClient:
         raise OutlookAuthError(self.account) from None
 
     def _ensure_token(self) -> None:
+        if self._held is not None:
+            self._save(self._held)
+            self._held = None
         if self._access_token is None or clock.now() >= self._expiry:
             self._refresh()
 
@@ -236,9 +245,21 @@ class OutlookClient:
             if type(rotated) is not str or rotated == "":
                 raise self._bad()
             if rotated != refresh_token:
-                keychain.set_secret(f"outlook.{self.account}.refresh-token", rotated)
+                try:
+                    self._save(rotated)
+                except OutlookTokenUnsaved:
+                    self._held = rotated
+                    self._access_token = None
+                    self._expiry = None
+                    raise
         self._access_token = token
         self._expiry = clock.now() + timedelta(seconds=expires_in) - TOKEN_MARGIN
+
+    def _save(self, token: str) -> None:
+        try:
+            keychain.set_secret(f"outlook.{self.account}.refresh-token", token)
+        except keychain.KeychainUnavailable:
+            raise OutlookTokenUnsaved(self.account) from None
 
     def _parsed(self, response: httpx.Response) -> object:
         try:

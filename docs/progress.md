@@ -281,3 +281,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - None
+
+## Phase 4h: Preserve rotated Outlook credentials (2026-11-21)
+- Tests: 1413 -> 1437 (given 18)
+- New public names: outlook: OutlookTokenUnsaved
+- Changed files: 4
+- Deviations:
+  - None
+- Follow-ups:
+  - None

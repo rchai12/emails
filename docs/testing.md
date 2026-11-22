@@ -35,6 +35,7 @@ A bug here lets the service leak a secret or email text, act without approval, o
 - `store/` (deduplication, email text cleared from the file after 24 hours, and every write committed or rolled back as a whole; Phase 1a, a package from Phase 2a)
 - `gmail.py` (read-only Gmail calls, secrets never echoed; Phase 1b)
 - `outlook.py` (read-only Graph calls, the rotated refresh token kept, the token sent only to Graph; Phase 4a)
+- `token_http.py` (the cached access token, one retry after a 401, a token sent only inside the provider's API, and errors that echo nothing; Phase 4m)
 - `gmail_sync.py` (what reaches the database: inbox only, once each, nothing lost on a failure; Phase 1c)
 - `mail_sync.py` (every provider's sync round: the first-run and catch-up windows, a stored message never fetched again, the bookmark saved only after a completed round; Phase 4l)
 - `gmail_login.py` (read-only scope only, secrets never shown, nothing stored on a failed sign-in; Phase 1d)

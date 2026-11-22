@@ -195,3 +195,30 @@ questions:
 The architect kept the call order: one clock read, then the bookmark, then the
 adapter's `begin()` profile read. The kind names `"history"` and `"delta"` stay in
 `SyncResult`. `mail_sync.py` was listed as a critical module.
+
+## Phase 4m shared token and HTTP mechanics (2026-11-22)
+
+The owner chose the recommended option in each of the architect's four multiple-choice
+questions:
+
+- **Module.** The token cache, the token post and reply check, the one-retry bearer
+  request and the transport mapping live in `mailroom/token_http.py`, which names no
+  provider. The other choices were adding them to `oauth.py`, the browser sign-in
+  module, or `mailroom/provider_http.py`.
+- **Shape.** Each client holds one `TokenSession`, built with its refresh function and
+  its own error factories. The other choices were a shared base class with hook
+  methods, or free functions only, which would have left each retry loop in place.
+- **Refresh.** The session posts the provider's form, maps transport and status
+  failures, treats the provider's listed codes as sign-in needed, and requires a `str`
+  access token and an `int` lifetime. Outlook's rotated refresh token and Phase 4h's
+  held token stay in `outlook.py`. The other choice was sharing only the cache and
+  retry.
+- **URL guard.** The session sends a token only to `https`, the API's exact host, no
+  port or user info, and a path under the API path with no dot segments. Anything else
+  is the client's unavailable error with `"response"`, before anything is sent. The
+  other choice was keeping only today's fixed URLs and Outlook's delta-link check.
+
+The architect added a `prepare` hook, run first on every token check, to carry 4h's
+held-token save. Errors stay the clients' own. `TOKEN_MARGIN` moved to `token_http`,
+and `gmail.TOKEN_MARGIN` and `outlook.TOKEN_MARGIN` name that object.
+`token_http.py` was listed as a critical module.

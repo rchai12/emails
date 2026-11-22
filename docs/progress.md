@@ -325,4 +325,4 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
 - Deviations:
   - None
 - Follow-ups:
-  - None
+  - Correction 2026-11-22: Gmail INBOX+SPAM test now reaches fetch (replaced the first-run test with a history-round test)

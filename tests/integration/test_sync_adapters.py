@@ -14,7 +14,7 @@ from mailroom.outlook import OutlookClient, OutlookUnavailable
 from mailroom.outlook_sync import sync_outlook
 from mailroom.store import Store, SyncState, open_store
 from tests.fakes import FakeGmail, FakeGraph, FakeKeychain
-from tests.integration.test_gmail_sync import SECRETS, bookmarked, deliver
+from tests.integration.test_gmail_sync import SECRETS, bookmarked, deliver, fetched
 from tests.integration.test_mail_sync import Scripted
 from tests.integration.test_outlook_sync import deliver as deliver_mail
 
@@ -68,11 +68,15 @@ def gets(requests: list[httpx.Request]) -> list[str]:
     return [request.url.path for request in requests if request.method == "GET"]
 
 
-def test_gmail_skips_mail_labelled_both_inbox_and_spam(gmail: FakeGmail, store: Store) -> None:
+def test_gmail_skips_mail_labelled_both_inbox_and_spam_after_fetching_it(
+    gmail: FakeGmail, store: Store
+) -> None:
+    bookmarked(store, "1000")
     deliver(gmail, 1, "2026-11-12T08:00:00+00:00", labels=("INBOX", "SPAM"))
-    deliver(gmail, 2, "2026-11-12T09:00:00+00:00")
     result = sync_gmail(gmail_client(gmail), store)
-    assert result.stored == ("personal/m2",)
+    assert result.kind == "history"
+    assert fetched(gmail) == ["m1"]
+    assert result.stored == ()
     assert store.get("gmail", "personal/m1") is None
 
 

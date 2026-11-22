@@ -162,3 +162,127 @@ def test_progress_refuses_duplicates_missing_replacements_and_invalid_entries(
 ) -> None:
     with pytest.raises(ValueError):
         progress.put_entry(original, entry, replace=replace)
+
+
+MUTATIONS = """suite = ["tests/test_calc.py"]
+
+[prefixes]
+TC = "tests/test_calc.py::"
+
+[[mutation]]
+id = "S1"
+file = "src/calc.py"
+where = "add"
+change = "Subtract instead"
+old = "return a + b"
+new = "return a - b"
+test = "tests/test_calc.py::test_add"
+correct = "5"
+broken = "-1 | wrong"
+
+[[mutation]]
+id = "S2"
+file = "src/calc.py"
+where = "add"
+change = "Swap the operands"
+old = "return a + b"
+new = "return b + a"
+test = "tests/test_calc.py::test_add"
+correct = "5"
+broken = "5"
+
+[[mutation]]
+id = "S3"
+file = "src/calc.py"
+where = "half"
+change = "Floor division"
+old = "return n / 2"
+new = "return n // 2"
+test = "tests/test_add_only.py::test_add"
+correct = "2.5"
+broken = "2"
+
+[[mutation]]
+id = "S4"
+file = "src/calc.py"
+where = "nowhere"
+change = "Text not in the file"
+old = "return missing"
+new = "return 0"
+test = "tests/test_calc.py::test_add"
+correct = "-"
+broken = "-"
+"""
+
+
+def synthetic_clone(root: Path) -> Path:
+    (root / "src").mkdir(parents=True)
+    (root / "tests").mkdir()
+    (root / "src/calc.py").write_text(
+        "def add(a, b):\n    return a + b\n\n\ndef half(n):\n    return n / 2\n"
+    )
+    test = "import calc\n\n\ndef test_add():\n    assert calc.add(2, 3) == 5\n"
+    (root / "tests/test_calc.py").write_text(
+        test + "\n\ndef test_half():\n    assert calc.half(5) == 2.5\n"
+    )
+    (root / "tests/test_add_only.py").write_text(test)
+    (root / "pytest.ini").write_text("[pytest]\npythonpath = src\n")
+    (root / ".venv").symlink_to(ROOT / ".venv")
+    return root
+
+
+def test_mutate_refuses_the_repository_and_writes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = tmp_path / "rows.toml"
+    rows.write_text(MUTATIONS)
+    calls = []
+    monkeypatch.setattr(phase_tools.subprocess, "run", lambda *a, **kw: calls.append(a))
+    assert phase_tools.mutate(ROOT, rows, False) == 2
+    assert phase_tools.mutate(ROOT / "src", rows, False) == 2
+    assert calls == []
+    assert "refusing to mutate the repository" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("suite = []\n", "no [[mutation]] rows"),
+        ('[[mutation]]\nid = "S1"\n', "mutation 1: missing broken, change, correct"),
+        (MUTATIONS.replace('id = "S2"', 'id = "S1"'), "mutation 2: repeated id S1"),
+        (MUTATIONS.replace('"return a - b"', '"return a + b"'), "mutation S1: old and new"),
+        (MUTATIONS.replace('broken = "5"', 'broken = "5"\nprobe = true'), "no top-level probe"),
+        ("[[mutation]\n", "Expected"),
+    ],
+    ids=["no-rows", "missing-keys", "repeated-id", "no-change", "probe-without-file", "not-toml"],
+)
+def test_mutate_refuses_a_bad_file_before_touching_the_clone(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], text: str, reason: str
+) -> None:
+    clone = synthetic_clone(tmp_path / "clone")
+    before = (clone / "src/calc.py").read_bytes()
+    rows = tmp_path / "rows.toml"
+    rows.write_text(text)
+    assert phase_tools.mutate(clone, rows, False) == 2
+    assert reason in capsys.readouterr().out
+    assert (clone / "src/calc.py").read_bytes() == before
+
+
+def test_mutate_reports_each_row_restores_bytes_and_prints_guide_rows(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    clone = synthetic_clone(tmp_path / "clone")
+    before = (clone / "src/calc.py").read_bytes()
+    rows = tmp_path / "rows.toml"
+    rows.write_text(MUTATIONS)
+    assert phase_tools.mutate(clone, rows, True) == 1
+    out = capsys.readouterr().out
+    assert "caught S1: assert -1 == 5" in out
+    assert "MISSED S2: deciding test passed; suite catches: nothing" in out
+    assert "MISSED S3: deciding test passed; suite catches: test_half" in out
+    assert "SKIPPED S4: old text found 0 times in src/calc.py" in out
+    assert "1/4 caught" in out
+    assert "| S1 | add | Subtract instead | TC test_add | 5 | -1 \\| wrong |" in out
+    assert "| S3 | half | Floor division | tests/test_add_only.py::test_add | 2.5 | 2 |" in out
+    assert (clone / "src/calc.py").read_bytes() == before
+    assert not [p for p in clone.rglob("__pycache__") if ".venv" not in p.parts]

@@ -31,7 +31,8 @@ operate on repository code, synthetic fixtures and temporary evidence only.
 | --- | --- |
 | `.claude/skills/phase-architect/phase_status.py` | Tree, commits, unreviewed specs, latest progress/review and public names |
 | `.claude/skills/phase-architect/phase_tools.py context <module ...>` | Source signatures, fields and constants without importing the application |
-| `.claude/skills/phase-architect/phase_tools.py --help` | Existing clone, given-test failcheck, template, promotion and search tools |
+| `.claude/skills/phase-architect/phase_tools.py --help` | Existing clone, given-test failcheck, template, promotion, search and mutation tools |
+| `.claude/skills/phase-architect/phase_tools.py mutate CLONE FILE.toml --table` | Run scratch mutations with no bytecode cache; name catching tests; print spot-check rows ([format](../.agents/skills/phase-architect/references/mutations.md)) |
 | `scripts/check.py --first tooling --quiet` | Section-first full gates; summary and Sections on screen, full output in fresh temporary logs |
 | `scripts/check.py --section tooling --quiet` | Focused tests without coverage; never substitutes for final acceptance |
 | `scripts/accept.py --phase <id> --dry-run` | List spec acceptance/search commands without running them |
@@ -116,3 +117,27 @@ The clone-deletion and silent search-error fixes each have a regression test
 observed failing before the fix. Mailroom production code, phase artifacts and
 existing progress entries were not changed. Pre-existing audit and handoff work
 was preserved, including the audit link already added to the docs index.
+
+## Workflow maintenance evidence: November 21, 2026
+
+After Phase 4h's 1,437 tests, this workflow-only change added 8 tooling tests. The
+verified starting suite for the next phase is **1,445 tests**: 85 tooling and 1,360
+core.
+
+- **`phase_tools.py mutate`** runs an architect's scratch mutations from a TOML file
+  ([format](../.agents/skills/phase-architect/references/mutations.md)):
+  - it refuses the repository and any path inside it;
+  - it clears bytecode before each run;
+  - it restores each file byte for byte;
+  - it names the suite tests that catch a missed row;
+  - with `--table` it prints the guide's spot-check rows.
+- **[Test helpers](../.agents/skills/phase-architect/references/test-helpers.md)**
+  records the fake and helper behavior that cost validation rounds in Phases 4g and
+  4h.
+
+`.venv/bin/python scripts/check.py --first tooling --quiet` ended with
+`All checks passed.`. The new tests failed without the new tool, and one of them
+found that a path inside the repository was not refused, which was fixed before
+recording. `mutate` reproduced the Phase 4h guide's 14 spot checks on that phase's
+scratch stand-in, 14 of 14 caught. Mailroom production code, phase artifacts and
+progress entries were not changed.

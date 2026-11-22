@@ -13,7 +13,8 @@ Read `AGENTS.md`, `docs/architecture.md`, `docs/testing.md`, then
 `docs/phase-conventions.md`. Read relevant design sections, the roadmap row,
 progress deviations, latest relevant review and actual code contracts before
 drafting. Read [handoffs](references/handoffs.md) before declaring work ready or
-handling a failed review. Paths below are relative to the repository root.
+handling a failed review. Read [test helpers](references/test-helpers.md) before
+writing given tests or a probe. Paths below are relative to the repository root.
 
 ## Establish facts and scope
 
@@ -68,6 +69,7 @@ Reuse `.claude/skills/phase-architect/phase_tools.py`; all commands start with
 | `new ...`, `guide SPEC --out FILE` | Email spec/guide skeletons |
 | `searches SPEC --cwd CLONE [--plant FILE]` | Searches; plant violations only in scratch |
 | `promote CLONE FILE... --ignore TEST...` | Copy explicit given paths and run Start |
+| `mutate CLONE FILE.toml [--table]` | Stand-in mutations, deciding tests, probe; guide rows ([format](references/mutations.md)) |
 
 Choose a fresh scratch parent if a clone exists. Use `PYTHONPATH=src:.` for every
 clone command and verify `mailroom.__file__` is inside it. Copy uncommitted
@@ -98,7 +100,8 @@ on the predecessor. Scheduled faults must respect earlier guarantees.
 Every spot-check row names the function, exact mutation, full given-test id,
 deciding input and distinct correct/broken values. Trace all defenses, schema
 constraints, later reads and fake clock limits. Strengthen tests that cannot see
-the mutation. Execute only in disposable scratch copies. An unrelated error is
+the mutation. Run them with `mutate`, not by hand, and take the guide's rows from
+`--table`. Execute only in disposable scratch copies. An unrelated error is
 not the intended evidence; a passing mutation may mean a weak test.
 
 ## Complete the handoff

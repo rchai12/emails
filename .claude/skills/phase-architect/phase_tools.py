@@ -33,8 +33,15 @@
         Write the verification guide's fixed parts from a finished spec: Coder ran, Gates, the
         probe section, Searches and Verdict. Spot checks and variations are left as TODO.
 
-Only `clone`, `promote` and `--plant` write files: the clone, the given files, and planted lines
-that are restored before it returns.
+    .venv/bin/python .claude/skills/phase-architect/phase_tools.py mutate CLONE FILE.toml [--table]
+        Apply each mutation in FILE to the clone (never the repository), one at a time, with no
+        bytecode cache. Run its deciding test, and the probe when the mutation asks. Restore the
+        file byte for byte, and print caught/MISSED per row. A row whose deciding test still
+        passes also lists every `suite` test that does catch it. --table prints the guide's
+        spot-check rows. File format: .agents/skills/phase-architect/references/mutations.md.
+
+Only `clone`, `promote`, `--plant` and `mutate` write files: the clone, the given files, planted
+lines and mutations, each restored before it returns except the clone and given files.
 """
 
 import argparse
@@ -45,6 +52,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from collections import Counter
 from pathlib import Path
 
@@ -189,6 +197,121 @@ def fail_check(clone: Path, tests: list[str]) -> int:
         print(f"{count:4}  {reason}")
     print(lines[-1] if lines else "no output")
     return 0
+
+
+MUTATION_KEYS = {"id", "file", "where", "change", "old", "new", "test", "correct", "broken"}
+
+
+def load_mutations(path: Path) -> dict:
+    """The mutation file, checked; raises ValueError naming the first bad row."""
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    rows = data.get("mutation")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("no [[mutation]] rows")
+    seen: set[str] = set()
+    for number, row in enumerate(rows, 1):
+        missing = sorted(MUTATION_KEYS - row.keys())
+        if missing:
+            raise ValueError(f"mutation {number}: missing {', '.join(missing)}")
+        if row["id"] in seen:
+            raise ValueError(f"mutation {number}: repeated id {row['id']}")
+        seen.add(row["id"])
+        if row["old"] == row["new"]:
+            raise ValueError(f"mutation {row['id']}: old and new are the same")
+        if row.get("probe") and "probe" not in data:
+            raise ValueError(f"mutation {row['id']}: probe = true but no top-level probe")
+    return data
+
+
+def clear_bytecode(clone: Path) -> None:
+    for folder in list(clone.rglob("__pycache__")):
+        if ".venv" not in folder.relative_to(clone).parts:
+            shutil.rmtree(folder, ignore_errors=True)
+
+
+def first_error(output: str) -> str:
+    """The first assertion or exception line of a failed pytest run, without paths."""
+    lines = output.splitlines()
+    found = [line for line in lines if line.startswith("E ")]
+    found += [line for line in lines if line.startswith("FAILED ")]
+    return re.sub(r"\s+", " ", found[0].removeprefix("E").strip())[:100] if found else ""
+
+
+def run_in(clone: Path, command: list[str]) -> subprocess.CompletedProcess[str]:
+    clear_bytecode(clone)
+    return subprocess.run(
+        [".venv/bin/python", *command], cwd=clone, env=clone_env(), capture_output=True, text=True
+    )
+
+
+def pytest_args(tests: list[str]) -> list[str]:
+    return ["-m", "pytest", "--no-cov", "-q", "-p", "no:cacheprovider", "--tb=short", *tests]
+
+
+def shown_test(test: str, prefixes: dict[str, str]) -> str:
+    for short, prefix in prefixes.items():
+        if test.startswith(prefix):
+            return f"{short} {test.removeprefix(prefix)}"
+    return test
+
+
+def mutate(clone: Path, path: Path, table: bool) -> int:
+    clone = clone.resolve()
+    if clone.is_relative_to(ROOT) or ROOT.is_relative_to(clone):
+        print("refusing to mutate the repository; pass a scratch clone")
+        return 2
+    try:
+        data = load_mutations(path)
+    except (ValueError, tomllib.TOMLDecodeError) as error:
+        print(f"bad mutation file: {error}")
+        return 2
+    rows, suite, probe = data["mutation"], data.get("suite", []), data.get("probe")
+    caught = 0
+    for row in rows:
+        target_file = clone / row["file"]
+        original = target_file.read_bytes()
+        text = original.decode()
+        count = text.count(row["old"])
+        if count != 1:
+            print(f"SKIPPED {row['id']}: old text found {count} times in {row['file']}")
+            continue
+        try:
+            target_file.write_text(text.replace(row["old"], row["new"]), encoding="utf-8")
+            done = run_in(clone, pytest_args([row["test"]]))
+            hit = done.returncode != 0
+            notes = [first_error(done.stdout)] if hit else ["deciding test passed"]
+            if row.get("probe"):
+                ran = run_in(clone, [probe])
+                last = [line for line in ran.stdout.splitlines() if line.strip()]
+                fail = [line for line in last if "FAIL" in line and "FAILURES" not in line]
+                notes.append("probe " + (fail[0][:80] if fail else (last[-1] if last else "")))
+                hit = hit and ran.returncode != 0
+            if not hit and suite:
+                wide = run_in(clone, pytest_args(suite))
+                names = [
+                    line.split("::", 1)[1].split(" ")[0]
+                    for line in wide.stdout.splitlines()
+                    if line.startswith("FAILED ")
+                ]
+                notes.append("suite catches: " + (", ".join(names) if names else "nothing"))
+        finally:
+            target_file.write_bytes(original)
+        if target_file.read_bytes() != original:
+            print(f"RESTORE FAILED {row['id']}: {row['file']}")
+            return 2
+        caught += hit
+        print(f"{'caught' if hit else 'MISSED'} {row['id']}: {'; '.join(n for n in notes if n)}")
+    clear_bytecode(clone)
+    print(f"{caught}/{len(rows)} caught")
+    if table:
+        prefixes = data.get("prefixes", {})
+        print("\n| # | Function/boundary | One-line mutation | Deciding test | Correct | Broken |")
+        print("|---|---|---|---|---|---|")
+        for row in rows:
+            cells = [row["id"], row["where"], row["change"], shown_test(row["test"], prefixes)]
+            cells += [row["correct"], row["broken"]]
+            print("| " + " | ".join(cell.replace("|", "\\|") for cell in cells) + " |")
+    return int(caught != len(rows))
 
 
 def promote(clone: Path, files: list[str], ignore: list[str]) -> int:
@@ -510,6 +633,10 @@ def main() -> int:
     guide = commands.add_parser("guide")
     guide.add_argument("spec", type=Path)
     guide.add_argument("--out", type=Path)
+    mutation = commands.add_parser("mutate")
+    mutation.add_argument("clone", type=Path)
+    mutation.add_argument("file", type=Path)
+    mutation.add_argument("--table", action="store_true")
     args = parser.parse_args()
     if args.command == "searches":
         if args.plant is not None:
@@ -525,6 +652,8 @@ def main() -> int:
         return fail_check(args.clone, args.tests)
     if args.command == "promote":
         return promote(args.clone, args.files, args.ignore)
+    if args.command == "mutate":
+        return mutate(args.clone, args.file, args.table)
     if args.command == "new":
         name = f"phase-{file_id(args.id)}-{args.slug}.md"
         return write(spec_skeleton(args), target(args.out, name))

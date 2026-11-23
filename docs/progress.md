@@ -326,3 +326,12 @@ One entry per phase, written by the coder, in the form `docs/phase-conventions.m
   - None
 - Follow-ups:
   - Correction 2026-11-22: Gmail INBOX+SPAM test now reaches fetch (replaced the first-run test with a history-round test)
+
+## Phase 4m: Share safe HTTP and token mechanics (2026-11-23)
+- Tests: 1577 -> 1644 (given 61)
+- New public names: token_http: TOKEN_MARGIN, Grant, TokenSession
+- Changed files: 6
+- Deviations:
+  - None
+- Follow-ups:
+  - None

@@ -1,20 +1,20 @@
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from urllib.parse import unquote, urlsplit
 
 import httpx
 
-from mailroom import clock, keychain
+from mailroom import keychain, token_http
 from mailroom.record import ACCOUNT_PATTERN
+from mailroom.token_http import Grant, TokenSession
 
 TOKEN_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
 API_URL = "https://graph.microsoft.com/v1.0/me"
 SCOPE = "https://graph.microsoft.com/Mail.Read offline_access"
 PAGE_SIZE = 50
 TIMEOUT_SECONDS = 30.0
-TOKEN_MARGIN = timedelta(seconds=60)
+TOKEN_MARGIN = token_http.TOKEN_MARGIN
 ACCOUNT_MESSAGE = "invalid account name"
 MESSAGE_ID_MESSAGE = "invalid message id"
 IMMUTABLE_ID = 'IdType="ImmutableId"'
@@ -88,9 +88,17 @@ class OutlookClient:
             raise ValueError(ACCOUNT_MESSAGE)
         self.account = account
         self.http = http
-        self._access_token: str | None = None
-        self._expiry: datetime | None = None
         self._held: str | None = None
+        self._session = TokenSession(
+            http,
+            api_url=API_URL,
+            token_url=TOKEN_URL,
+            auth_codes=_AUTH_ERRORS,
+            refresh=self._refresh,
+            auth_error=lambda: OutlookAuthError(account),
+            unavailable=lambda detail: OutlookUnavailable(account, detail),
+            prepare=self._save_held,
+        )
 
     def profile(self) -> Profile:
         me = self._json(f"{API_URL}", {"$select": "mail,userPrincipalName"})
@@ -190,58 +198,32 @@ class OutlookClient:
         self, url: str, params: dict[str, str] | None, *, delta: bool = False
     ) -> httpx.Response:
         prefer = _DELTA_PREFER if delta else IMMUTABLE_ID
-        for _attempt in range(2):
-            self._ensure_token()
-            response = self._send(
-                lambda: self.http.get(
-                    url,
-                    params=params,
-                    headers={
-                        "Authorization": f"Bearer {self._access_token}",
-                        "Prefer": prefer,
-                    },
-                )
-            )
-            if response.status_code != 401:
-                return response
-            self._access_token = None
-        raise OutlookAuthError(self.account) from None
+        return self._session.get(url, params=params, headers={"Prefer": prefer})
 
     def _ensure_token(self) -> None:
+        self._session.ensure()
+
+    def _save_held(self) -> None:
         if self._held is not None:
             self._save(self._held)
             self._held = None
-        if self._access_token is None or clock.now() >= self._expiry:
-            self._refresh()
 
-    def _refresh(self) -> None:
+    def _refresh(self) -> Grant:
         try:
             client_id = keychain.get_secret(f"outlook.{self.account}.client-id")
             refresh_token = keychain.get_secret(f"outlook.{self.account}.refresh-token")
         except keychain.SecretMissing:
             raise OutlookAuthError(self.account) from None
-        response = self._send(
-            lambda: self.http.post(
-                TOKEN_URL,
-                data={
-                    "client_id": client_id,
-                    "refresh_token": refresh_token,
-                    "grant_type": "refresh_token",
-                    "scope": SCOPE,
-                },
-            )
+        grant = self._session.grant(
+            {
+                "client_id": client_id,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+                "scope": SCOPE,
+            }
         )
-        if response.status_code in (400, 401) and _oauth_error(response) in _AUTH_ERRORS:
-            raise OutlookAuthError(self.account) from None
-        if response.status_code != 200:
-            raise OutlookUnavailable(self.account, response.status_code) from None
-        body = _object(self._parsed(response), self.account)
-        token = body.get("access_token")
-        expires_in = body.get("expires_in")
-        if type(token) is not str or type(expires_in) is not int:
-            raise self._bad()
-        if "refresh_token" in body:
-            rotated = body["refresh_token"]
+        if "refresh_token" in grant.body:
+            rotated = grant.body["refresh_token"]
             if type(rotated) is not str or rotated == "":
                 raise self._bad()
             if rotated != refresh_token:
@@ -249,11 +231,8 @@ class OutlookClient:
                     self._save(rotated)
                 except OutlookTokenUnsaved:
                     self._held = rotated
-                    self._access_token = None
-                    self._expiry = None
                     raise
-        self._access_token = token
-        self._expiry = clock.now() + timedelta(seconds=expires_in) - TOKEN_MARGIN
+        return grant
 
     def _save(self, token: str) -> None:
         try:
@@ -266,12 +245,6 @@ class OutlookClient:
             return response.json()
         except ValueError:
             raise self._bad() from None
-
-    def _send(self, send: Callable[[], httpx.Response]) -> httpx.Response:
-        try:
-            return send()
-        except httpx.TransportError:
-            raise OutlookUnavailable(self.account, "network") from None
 
     def _bad(self) -> OutlookUnavailable:
         return OutlookUnavailable(self.account, "response")
@@ -306,16 +279,6 @@ def _delta_expired(response: httpx.Response) -> bool:
     except (ValueError, KeyError, TypeError):
         return False
     return type(code) is str and code.lower() == "syncstatenotfound"
-
-
-def _oauth_error(response: httpx.Response) -> str | None:
-    try:
-        error = response.json()["error"]
-    except (ValueError, KeyError, TypeError):
-        return None
-    if type(error) is str:
-        return error
-    return None
 
 
 def _address(body: dict[str, object], account: str) -> str:

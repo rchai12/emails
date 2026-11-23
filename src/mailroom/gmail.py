@@ -1,20 +1,20 @@
 import base64
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import httpx
 
-from mailroom import clock, keychain
+from mailroom import keychain, token_http
 from mailroom.record import ACCOUNT_PATTERN
+from mailroom.token_http import Grant, TokenSession
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
 SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 PAGE_SIZE = 500
 TIMEOUT_SECONDS = 30.0
-TOKEN_MARGIN = timedelta(seconds=60)
+TOKEN_MARGIN = token_http.TOKEN_MARGIN
 ACCOUNT_MESSAGE = "invalid account name"
 MESSAGE_ID_MESSAGE = "invalid message id"
 
@@ -74,22 +74,21 @@ class RawMessage:
     raw: bytes
 
 
-def _invalid_grant(response: httpx.Response) -> bool:
-    try:
-        error = response.json()["error"]
-    except (ValueError, KeyError, TypeError, IndexError):
-        error = None
-    return error == "invalid_grant"
-
-
 class GmailClient:
     def __init__(self, account: str, http: httpx.Client) -> None:
         if _ACCOUNT.fullmatch(account) is None:
             raise ValueError(ACCOUNT_MESSAGE)
         self.account = account
         self.http = http
-        self._access_token: str | None = None
-        self._expiry: datetime | None = None
+        self._session = TokenSession(
+            http,
+            api_url=API_URL,
+            token_url=TOKEN_URL,
+            auth_codes=frozenset({"invalid_grant"}),
+            refresh=self._refresh,
+            auth_error=lambda: GmailAuthError(account),
+            unavailable=lambda detail: GmailUnavailable(account, detail),
+        )
 
     def profile(self) -> Profile:
         body = self._read("/profile", {})
@@ -187,56 +186,23 @@ class GmailClient:
         return self._mapping(self._json_body(response))
 
     def _get(self, path: str, params: dict[str, object]) -> httpx.Response:
-        for _ in range(2):
-            response = self._request(path, params)
-            if response.status_code != 401:
-                return response
-            self._access_token = None
-        raise GmailAuthError(self.account) from None
+        return self._session.get(f"{API_URL}{path}", params=params)
 
-    def _request(self, path: str, params: dict[str, object]) -> httpx.Response:
-        self._ensure_token()
-        return self._send(
-            lambda: self.http.get(
-                f"{API_URL}{path}",
-                params=params,
-                headers={"Authorization": f"Bearer {self._access_token}"},
-            )
-        )
-
-    def _ensure_token(self) -> None:
-        if self._access_token is None or clock.now() >= self._expiry:
-            self._refresh()
-
-    def _refresh(self) -> None:
+    def _refresh(self) -> Grant:
         try:
             client_id = keychain.get_secret(f"gmail.{self.account}.client-id")
             client_secret = keychain.get_secret(f"gmail.{self.account}.client-secret")
             refresh_token = keychain.get_secret(f"gmail.{self.account}.refresh-token")
         except keychain.SecretMissing:
             raise GmailAuthError(self.account) from None
-        response = self._send(
-            lambda: self.http.post(
-                TOKEN_URL,
-                data={
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "refresh_token": refresh_token,
-                    "grant_type": "refresh_token",
-                },
-            )
+        return self._session.grant(
+            {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            }
         )
-        if response.status_code in (400, 401) and _invalid_grant(response):
-            raise GmailAuthError(self.account) from None
-        if response.status_code != 200:
-            raise GmailUnavailable(self.account, response.status_code) from None
-        body = self._mapping(self._json_body(response))
-        token = body.get("access_token")
-        expires_in = body.get("expires_in")
-        if type(token) is not str or type(expires_in) is not int:
-            raise GmailUnavailable(self.account, "response") from None
-        self._access_token = token
-        self._expiry = clock.now() + timedelta(seconds=expires_in) - TOKEN_MARGIN
 
     def _json_body(self, response: httpx.Response) -> object:
         try:
@@ -293,12 +259,6 @@ class GmailClient:
             return int(text)
         except ValueError:
             raise GmailUnavailable(self.account, "response") from None
-
-    def _send(self, send: Callable[[], httpx.Response]) -> httpx.Response:
-        try:
-            return send()
-        except httpx.TransportError:
-            raise GmailUnavailable(self.account, "network") from None
 
 
 def open_gmail(account: str) -> GmailClient:
